@@ -1,0 +1,2933 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KisanMind — AI Farmer Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ─────────────────────────────────────────
+           Chat-bubble look for every agent result
+           (CSS-only — no HTML/JS changes required)
+           ───────────────────────────────────────── */
+
+        /* Subtle bubble pop-in animation */
+        @keyframes km-bubble-in {
+            from { opacity: 0; transform: translateY(8px) scale(0.985); }
+            to   { opacity: 1; transform: translateY(0)    scale(1);     }
+        }
+
+        /* Each agent's result panel becomes a bot chat bubble */
+        #soilResult:not(.hidden),
+        #diseaseResult:not(.hidden),
+        #mandiResult:not(.hidden),
+        #yojanaResult:not(.hidden) {
+            position: relative;
+            display: block;
+            max-width: 92%;
+            margin-left: 56px;       /* leave room for the avatar on the left  */
+            margin-right: 8px;
+            padding: 14px 16px;
+            background: #ffffff;
+            border: 1px solid #bbf7d0;          /* tailwind green-200 */
+            border-left: 4px solid #16a34a;     /* tailwind green-600 accent  */
+            border-radius: 4px 18px 18px 18px;  /* chat-bubble corner cut     */
+            box-shadow: 0 2px 6px rgba(22, 101, 52, 0.08);
+            line-height: 1.55;
+            animation: km-bubble-in 220ms ease-out;
+        }
+
+        /* Bot avatar (🌾) sitting to the left of every result bubble */
+        #soilResult:not(.hidden)::before,
+        #diseaseResult:not(.hidden)::before,
+        #mandiResult:not(.hidden)::before,
+        #yojanaResult:not(.hidden)::before {
+            content: "🌾";
+            position: absolute;
+            top: 8px;
+            left: -52px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            background: #166534;            /* tailwind green-800 */
+            color: #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        /* Tiny "KisanMind" name tag above each bubble */
+        #soilResult:not(.hidden)::after,
+        #diseaseResult:not(.hidden)::after,
+        #mandiResult:not(.hidden)::after,
+        #yojanaResult:not(.hidden)::after {
+            content: "KisanMind";
+            position: absolute;
+            top: -10px;
+            left: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            color: #166534;
+            background: #ecfdf5;
+            padding: 1px 8px;
+            border-radius: 8px;
+            text-transform: uppercase;
+        }
+
+        /* Make the existing chat tab feel a touch more chat-app like */
+        #chatMessages {
+            background:
+                radial-gradient(circle at 12px 12px, rgba(22,163,74,0.05) 1px, transparent 1px) 0 0/24px 24px,
+                #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+        #chatMessages > div { animation: km-bubble-in 200ms ease-out; }
+
+        /* Polish the existing chat bubbles (no markup changes — these target
+           the existing Tailwind classes already used in chatMessages)        */
+        #chatMessages .bg-green-600 {
+            border-radius: 18px 18px 4px 18px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        }
+        #chatMessages .bg-white {
+            border-radius: 18px 18px 18px 4px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        }
+        /* Refined bot reply card */
+        .km-bot-card {
+            background: #ffffff;
+            border: 1px solid #bbf7d0;
+            border-left: 4px solid #16a34a;
+            border-radius: 14px 14px 14px 4px;
+            box-shadow: 0 2px 6px rgba(22,101,52,0.08);
+            padding: 10px 14px;
+            max-width: 82%;
+            line-height: 1.55;
+            color: #1f2937;
+            font-size: 0.92rem;
+        }
+        .km-bot-card strong { color:#15803d; font-weight:600; }
+        .km-bot-card ul, .km-bot-card ol { margin: 6px 0 6px 4px; padding-left: 18px; }
+        .km-bot-card li { margin: 2px 0; }
+        .km-bot-card ul li::marker { color:#16a34a; }
+        .km-bot-card ol li::marker { color:#15803d; font-weight:600; }
+        .km-bot-card p { margin: 4px 0; }
+        .km-bot-card .km-disclaimer {
+            margin-top: 10px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: #fef9c3;
+            color: #854d0e;
+            font-size: 0.78rem;
+            font-style: italic;
+            border-left: 3px solid #facc15;
+        }
+        .km-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg,#16a34a,#15803d);
+            color:#fff;
+            display:flex; align-items:center; justify-content:center;
+            font-size: 16px;
+            flex-shrink: 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        }
+        .km-user-avatar {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background:#fef3c7;
+            color:#92400e;
+            display:flex; align-items:center; justify-content:center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        /* Weather widget result also gets a soft bubble feel */
+        #weatherResult:not(.hidden) {
+            border-radius: 14px;
+            animation: km-bubble-in 220ms ease-out;
+        }
+
+        /* Mobile tweak — hide the avatar on very small screens so the bubble
+           can use the full width comfortably */
+        @media (max-width: 480px) {
+            #soilResult:not(.hidden),
+            #diseaseResult:not(.hidden),
+            #mandiResult:not(.hidden),
+            #yojanaResult:not(.hidden) {
+                margin-left: 8px;
+                max-width: 100%;
+            }
+            #soilResult:not(.hidden)::before,
+            #diseaseResult:not(.hidden)::before,
+            #mandiResult:not(.hidden)::before,
+            #yojanaResult:not(.hidden)::before { display: none; }
+        }
+    </style>
+</head>
+<body class="bg-green-50 min-h-screen">
+
+    <!-- Floating "Stop Voice" button — appears only while the app is reading
+         a reply aloud. Visible on every tab/page. -->
+    <button type="button" id="stopVoiceFab" onclick="stopVoiceNow(event)"
+            data-i18n-title="voice.stopTitle"
+            title="Stop voice"
+            class="hidden fixed bottom-5 right-5 z-50 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-full shadow-lg px-4 py-3 flex items-center gap-2 animate-pulse">
+        <span>⏹️</span>
+        <span data-i18n="voice.stop">Stop Voice</span>
+    </button>
+
+    <!-- Header -->
+    <header class="bg-green-800 text-white py-4 px-6 shadow-lg">
+        <div class="max-w-5xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+            <h1 class="text-2xl font-bold">🌾 <span data-i18n="hdr.title">KisanMind</span></h1>
+            <div class="flex items-center gap-2 flex-wrap">
+                <p class="text-green-200 text-sm hidden sm:block" data-i18n="hdr.tagline">AI-Powered Farmer Assistant</p>
+                <button type="button" id="globalSpeakerBtn" onclick="toggleSpeaker(event)"
+                        data-i18n-title="hdr.autoReadTitle"
+                        title="Auto-read replies"
+                        class="bg-green-900 text-white text-sm rounded px-2 py-1 border border-green-700 cursor-pointer hover:bg-green-950">
+                    🔈 <span data-i18n="hdr.autoRead">Auto-Read</span>
+                </button>
+                <label class="bg-green-900 text-white text-sm rounded px-2 py-1 border border-green-700 flex items-center gap-1"
+                       data-i18n-title="voice.speed" title="Voice speed">
+                    <span>⚡</span>
+                    <select id="voiceSpeedSel" onchange="setVoiceSpeed(this.value)"
+                            class="bg-green-900 text-white text-sm border-0 outline-none cursor-pointer">
+                        <option value="0.8" data-i18n="voice.speedSlow">Slow</option>
+                        <option value="0.95" selected data-i18n="voice.speedNormal">Normal</option>
+                        <option value="1.2" data-i18n="voice.speedFast">Fast</option>
+                    </select>
+                </label>
+                <button type="button" id="profileBtn" onclick="openProfile(event)"
+                        data-i18n-title="profile.openTitle"
+                        title="My farm profile"
+                        class="bg-green-900 text-white text-sm rounded px-2 py-1 border border-green-700 cursor-pointer hover:bg-green-950">
+                    👤 <span data-i18n="profile.openBtn">My Profile</span>
+                </button>
+                <select id="langToggle" onchange="setVoiceLang(this.value)"
+                        title="Language / भाषा"
+                        class="bg-green-900 text-white text-sm rounded px-2 py-1 border border-green-700 cursor-pointer">
+                    <option value="hi-IN">🗣️ हिंदी</option>
+                    <option value="en-IN">🗣️ English</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4" onclick="if(event.target===this) closeProfile()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="bg-green-700 text-white px-5 py-3 rounded-t-2xl flex items-center justify-between">
+                <h3 class="font-bold text-lg">👤 <span data-i18n="profile.modalTitle">My Farm Profile</span></h3>
+                <button type="button" onclick="closeProfile()" class="text-white text-2xl leading-none hover:text-green-200">×</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <p class="text-xs text-gray-500" data-i18n="profile.help">Save your farm details once — we'll auto-fill them across Weather, Region Soil, Mandi, Disease and Schemes.</p>
+
+                <div>
+                    <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="profile.cityLabel">City / Town</label>
+                    <input id="profileCity" type="text"
+                        data-i18n-placeholder="profile.cityPlaceholder"
+                        placeholder="e.g. Indore / इंदौर"
+                        class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-400 focus:outline-none"/>
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="profile.stateLabel">State</label>
+                    <select id="profileState"
+                        class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-green-400 focus:outline-none">
+                        <option value="" data-i18n="profile.statePlaceholder">-- Select State --</option>
+                        <option value="Andhra Pradesh">Andhra Pradesh (आंध्र प्रदेश)</option>
+                        <option value="Arunachal Pradesh">Arunachal Pradesh (अरुणाचल प्रदेश)</option>
+                        <option value="Assam">Assam (असम)</option>
+                        <option value="Bihar">Bihar (बिहार)</option>
+                        <option value="Chhattisgarh">Chhattisgarh (छत्तीसगढ़)</option>
+                        <option value="Goa">Goa (गोवा)</option>
+                        <option value="Gujarat">Gujarat (गुजरात)</option>
+                        <option value="Haryana">Haryana (हरियाणा)</option>
+                        <option value="Himachal Pradesh">Himachal Pradesh (हिमाचल प्रदेश)</option>
+                        <option value="Jharkhand">Jharkhand (झारखंड)</option>
+                        <option value="Karnataka">Karnataka (कर्नाटक)</option>
+                        <option value="Kerala">Kerala (केरल)</option>
+                        <option value="Madhya Pradesh">Madhya Pradesh (मध्य प्रदेश)</option>
+                        <option value="Maharashtra">Maharashtra (महाराष्ट्र)</option>
+                        <option value="Manipur">Manipur (मणिपुर)</option>
+                        <option value="Meghalaya">Meghalaya (मेघालय)</option>
+                        <option value="Mizoram">Mizoram (मिज़ोरम)</option>
+                        <option value="Nagaland">Nagaland (नागालैंड)</option>
+                        <option value="Odisha">Odisha (ओडिशा)</option>
+                        <option value="Punjab">Punjab (पंजाब)</option>
+                        <option value="Rajasthan">Rajasthan (राजस्थान)</option>
+                        <option value="Sikkim">Sikkim (सिक्किम)</option>
+                        <option value="Tamil Nadu">Tamil Nadu (तमिल नाडु)</option>
+                        <option value="Telangana">Telangana (तेलंगाना)</option>
+                        <option value="Tripura">Tripura (त्रिपुरा)</option>
+                        <option value="Uttar Pradesh">Uttar Pradesh (उत्तर प्रदेश)</option>
+                        <option value="Uttarakhand">Uttarakhand (उत्तराखंड)</option>
+                        <option value="West Bengal">West Bengal (पश्चिम बंगाल)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="profile.cropLabel">Main Crop</label>
+                    <select id="profileCrop"
+                        class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-green-400 focus:outline-none">
+                        <option value="" data-i18n="profile.cropPlaceholder">-- Select Main Crop --</option>
+                        <option value="Wheat">🌾 Wheat (गेहूं)</option>
+                        <option value="Rice">🌾 Rice (चावल)</option>
+                        <option value="Maize">🌽 Maize (मक्का)</option>
+                        <option value="Cotton">🌿 Cotton (कपास)</option>
+                        <option value="Tomato">🍅 Tomato (टमाटर)</option>
+                        <option value="Onion">🧅 Onion (प्याज)</option>
+                        <option value="Potato">🥔 Potato (आलू)</option>
+                        <option value="Soybean">🫘 Soybean (सोयाबीन)</option>
+                    </select>
+                </div>
+
+                <p id="profileStatus" class="text-xs text-green-700 hidden"></p>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="saveProfile(event)"
+                        class="flex-1 bg-green-700 text-white py-2 rounded-lg font-semibold text-sm hover:bg-green-800"
+                        data-i18n="profile.saveBtn">💾 Save Profile</button>
+                    <button type="button" onclick="clearProfile(event)"
+                        class="bg-white border border-red-400 text-red-600 px-3 py-2 rounded-lg text-sm hover:bg-red-50"
+                        data-i18n="profile.clearBtn">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nav Tabs -->
+    <div class="bg-green-700 text-white">
+        <div class="max-w-5xl mx-auto flex overflow-x-auto">
+            <button type="button" onclick="showTab('soil')" id="tab-soil" class="tab-btn px-5 py-3 text-sm font-medium bg-green-900">🌱 <span data-i18n="nav.soil">Soil</span></button>
+            <button type="button" onclick="showTab('chat')" id="tab-chat" class="tab-btn px-5 py-3 text-sm font-medium hover:bg-green-900">💬 <span data-i18n="nav.chat">Chat</span></button>
+            <button type="button" onclick="showTab('doctor')" id="tab-doctor" class="tab-btn px-5 py-3 text-sm font-medium hover:bg-green-900">🦠 <span data-i18n="nav.doctor">Disease Detection</span></button>
+            <button type="button" onclick="showTab('mandi')" id="tab-mandi" class="tab-btn px-5 py-3 text-sm font-medium hover:bg-green-900">💰 <span data-i18n="nav.mandi">Mandi</span></button>
+            <button type="button" onclick="showTab('yojana')" id="tab-yojana" class="tab-btn px-5 py-3 text-sm font-medium hover:bg-green-900">🏛️ <span data-i18n="nav.yojana">Schemes</span></button>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6">
+
+        <!-- WEATHER WIDGET (compact, shown on every tab) -->
+        <div class="bg-white rounded-xl shadow p-4 mb-4 border border-green-200">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🌦️</span>
+                    <h3 class="font-semibold text-green-800 text-sm" data-i18n="weather.title">Weather</h3>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <input id="weatherCity" type="text"
+                        data-i18n-placeholder="weather.cityPlaceholder"
+                        placeholder="City e.g. Lucknow"
+                        class="border rounded px-2 py-1 text-sm"
+                        onkeypress="if(event.key==='Enter') getWeatherByCity(event)"/>
+                    <button type="button" onclick="getWeatherByCity(event)"
+                        class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                        data-i18n="weather.search">Search</button>
+                    <button type="button" onclick="getWeatherByLocation(event)"
+                        data-i18n-title="weather.myLocationTitle"
+                        title="Use my location"
+                        class="bg-white border border-green-600 text-green-700 px-3 py-1 rounded text-sm hover:bg-green-50">📍 <span data-i18n="weather.myLocation">My Location</span></button>
+                </div>
+            </div>
+            <div id="weatherResult" class="mt-3 text-sm text-gray-700 hidden"></div>
+        </div>
+
+        <!-- 1. SOIL AGENT -->
+        <div id="page-soil" class="page-section">
+            <!-- Region-based crop suggestions (city / GPS → state advice) -->
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6">
+                <h2 class="text-lg sm:text-xl font-bold text-green-700 mb-1">🗺️ <span data-i18n="region.title">Region-Based Crop Suggestions</span></h2>
+                <p class="text-gray-500 text-sm mb-4" data-i18n="region.subtitle">Type your city (English or Hindi) or use GPS — get the soil type and best crops for your state.</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <div class="sm:col-span-2">
+                        <label class="text-sm text-gray-600" data-i18n="region.cityLabel">City / Town</label>
+                        <input id="regionCity" type="text"
+                            data-i18n-placeholder="region.cityPlaceholder"
+                            placeholder="e.g. Indore / इंदौर"
+                            class="w-full border border-gray-300 rounded-lg p-2 mt-1 text-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();getRegionAdvice(event);}"/>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="getRegionAdvice(event)"
+                            class="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
+                            data-i18n="region.getBtn">🌾 Get Region Advice</button>
+                        <button type="button" onclick="getRegionAdviceByGPS(event)"
+                            title="Use my location"
+                            class="bg-white border border-green-600 text-green-700 px-3 py-2 rounded-lg text-sm hover:bg-green-50"
+                            data-i18n="region.useLocation">📍 Use My Location</button>
+                    </div>
+                </div>
+
+                <p id="regionNote" class="text-xs text-gray-500 mt-2 hidden"></p>
+                <div id="regionResult" class="mt-4 hidden"></div>
+            </div>
+        </div>
+
+        <!-- 2. CHAT -->
+        <div id="page-chat" class="page-section hidden">
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6">
+                <h2 class="text-xl font-bold text-green-700 mb-2">💬 <span data-i18n="chat.title">Kisan Chatbot</span></h2>
+                <p class="text-gray-500 text-sm mb-4" data-i18n="chat.subtitle">Ask anything about farming — answers in your selected language.</p>
+                <div id="chatMessages" class="h-64 overflow-y-auto bg-green-50 rounded-lg p-3 mb-3 space-y-3"></div>
+                <div class="flex gap-2 flex-wrap">
+                    <input id="chatInput" type="text"
+                        data-i18n-placeholder="chat.placeholder"
+                        placeholder="Type your question or press 🎤..."
+                        class="border rounded-lg p-2 flex-1 min-w-[140px]"
+                        onkeypress="if(event.key==='Enter') testChat(event)"/>
+                    <button type="button" id="micBtn" onclick="toggleMic(event)"
+                        data-i18n-title="chat.micTitle"
+                        title="Speak to type"
+                        class="bg-white border border-green-600 text-green-700 px-3 py-2 rounded-lg hover:bg-green-50">🎤</button>
+                    <button type="button" id="speakerBtn" onclick="toggleSpeaker(event)"
+                        data-i18n-title="chat.speakerTitle"
+                        title="Read replies aloud"
+                        class="bg-white border border-green-600 text-green-700 px-3 py-2 rounded-lg hover:bg-green-50">🔈</button>
+                    <button type="button" onclick="testChat(event)"
+                        class="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700"
+                        data-i18n="chat.send">Send</button>
+                    <button type="button" onclick="resetChat(event)"
+                        class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500"
+                        data-i18n="chat.reset">Reset</button>
+                </div>
+                <p id="micStatus" class="text-xs text-gray-500 mt-2 hidden"></p>
+            </div>
+        </div>
+
+        <!-- 3. DISEASE DETECTION -->
+        <div id="page-doctor" class="page-section hidden">
+
+            <!-- Disease Detection -->
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6 border-l-4 border-green-600">
+                <h2 class="text-xl font-bold text-green-700 mb-1">🦠 <span data-i18n="disease.title">Disease Detection</span></h2>
+                <p class="text-gray-500 text-sm mb-4" data-i18n="disease.subtitle">Select your crop, upload a photo — get instant diagnosis in your language.</p>
+
+                <!-- Row 1: Crop dropdown + Language toggle -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="disease.cropLabel">Select Crop</label>
+                        <select id="diseaseCrop"
+                            class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-400 focus:outline-none bg-white">
+                            <option value="" data-i18n="disease.cropDefault">-- Select Crop (optional) --</option>
+                            <option value="Wheat">🌾 Wheat (गेहूं)</option>
+                            <option value="Rice">🌾 Rice (चावल)</option>
+                            <option value="Potato">🥔 Potato (आलू)</option>
+                            <option value="Tomato">🍅 Tomato (टमाटर)</option>
+                            <option value="Onion">🧅 Onion (प्याज)</option>
+                            <option value="Cotton">🌿 Cotton (कपास)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="disease.langLabel">Reply Language</label>
+                        <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+                            <button type="button" id="diseaseLangHi"
+                                onclick="setDiseaseLang('hi')"
+                                class="flex-1 py-2 font-medium bg-green-600 text-white transition-colors">हिंदी</button>
+                            <button type="button" id="diseaseLangEn"
+                                onclick="setDiseaseLang('en')"
+                                class="flex-1 py-2 font-medium bg-white text-gray-600 hover:bg-gray-50 transition-colors">English</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instruction text (language-aware) -->
+                <p id="diseaseInstruction" class="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3"
+                    data-i18n="disease.instruction">Upload a clear image of the affected plant leaf</p>
+
+                <!-- Upload + preview -->
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="disease.uploadLabel">Upload crop / leaf photo</label>
+                    <label for="diseaseImage"
+                        class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-400 rounded-xl cursor-pointer bg-green-50 hover:bg-green-100 transition-colors">
+                        <span class="text-3xl mb-1">📷</span>
+                        <span id="diseaseFileName" class="text-sm text-green-700 font-medium">Tap to choose photo</span>
+                        <span class="text-xs text-gray-400 mt-1">JPG, PNG, WEBP supported</span>
+                        <input id="diseaseImage" type="file"
+                            accept="image/*,.webp,.jpg,.jpeg,.png"
+                            class="hidden"/>
+                    </label>
+                </div>
+
+                <!-- Image preview -->
+                <div id="diseasePreviewWrapper" class="hidden mb-3 flex justify-center">
+                    <img id="diseasePreview" src="" alt="Preview"
+                        class="w-40 h-40 object-cover rounded-xl border-2 border-green-400 shadow"/>
+                </div>
+
+                <!-- Scan button -->
+                <button type="button" onclick="detectDisease(event)"
+                    class="w-full bg-green-700 text-white py-3 rounded-xl font-semibold text-base hover:bg-green-800 active:scale-95 transition-all"
+                    data-i18n="disease.detectBtn">🔬 Scan Crop</button>
+
+                <!-- Loading animation -->
+                <div id="diseaseScanningAnim" class="hidden mt-4 flex flex-col items-center gap-2 py-4">
+                    <div class="flex gap-1">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-bounce" style="animation-delay:0s"></span>
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-bounce" style="animation-delay:.15s"></span>
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-bounce" style="animation-delay:.3s"></span>
+                    </div>
+                    <p id="diseaseScanningText" class="text-sm text-green-700 font-medium" data-i18n="disease.scanning">Scanning... please wait</p>
+                </div>
+
+                <!-- Result card -->
+                <div id="diseaseResult" class="mt-4 hidden"></div>
+            </div>
+        </div>
+
+        <!-- 4. MANDI BHAV -->
+        <div id="page-mandi" class="page-section hidden">
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6">
+                <h2 class="text-xl font-bold text-green-700 mb-1">💰 <span data-i18n="mandi.title">Mandi Prices</span></h2>
+                <p class="text-gray-500 text-sm mb-4" data-i18n="mandi.subtitle">Live mandi prices and selling advice.</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <!-- Crop dropdown -->
+                    <div>
+                        <label class="text-sm font-medium text-gray-700 mb-1 block">🌾 <span data-i18n="mandi.commodity">Crop</span></label>
+                        <select id="commodity"
+                            class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-green-400 focus:outline-none">
+                            <option value="" data-i18n="mandi.selectCrop">-- Select Crop --</option>
+                            <option value="Wheat">🌾 Wheat (गेहूं)</option>
+                            <option value="Rice">🌾 Rice (चावल)</option>
+                            <option value="Maize">🌽 Maize (मक्का)</option>
+                            <option value="Cotton">🌿 Cotton (कपास)</option>
+                            <option value="Tomato">🍅 Tomato (टमाटर)</option>
+                            <option value="Onion">🧅 Onion (प्याज)</option>
+                            <option value="Potato">🥔 Potato (आलू)</option>
+                            <option value="Soybean">🫘 Soybean (सोयाबीन)</option>
+                            <option value="Mustard">🌼 Mustard (सरसों)</option>
+                            <option value="Sugarcane">🎋 Sugarcane (गन्ना)</option>
+                            <option value="Groundnut">🥜 Groundnut (मूंगफली)</option>
+                            <option value="Gram">🫘 Gram (चना)</option>
+                        </select>
+                    </div>
+
+                    <!-- State dropdown -->
+                    <div>
+                        <label class="text-sm font-medium text-gray-700 mb-1 block">📍 <span data-i18n="mandi.state">State</span></label>
+                        <select id="mandiState"
+                            class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-green-400 focus:outline-none">
+                            <option value="" data-i18n="mandi.selectState">-- Select State --</option>
+                            <option value="Andhra Pradesh">Andhra Pradesh (आंध्र प्रदेश)</option>
+                            <option value="Arunachal Pradesh">Arunachal Pradesh (अरुणाचल प्रदेश)</option>
+                            <option value="Assam">Assam (असम)</option>
+                            <option value="Bihar">Bihar (बिहार)</option>
+                            <option value="Chhattisgarh">Chhattisgarh (छत्तीसगढ़)</option>
+                            <option value="Goa">Goa (गोवा)</option>
+                            <option value="Gujarat">Gujarat (गुजरात)</option>
+                            <option value="Haryana">Haryana (हरियाणा)</option>
+                            <option value="Himachal Pradesh">Himachal Pradesh (हिमाचल प्रदेश)</option>
+                            <option value="Jharkhand">Jharkhand (झारखंड)</option>
+                            <option value="Karnataka">Karnataka (कर्नाटक)</option>
+                            <option value="Kerala">Kerala (केरल)</option>
+                            <option value="Madhya Pradesh">Madhya Pradesh (मध्य प्रदेश)</option>
+                            <option value="Maharashtra">Maharashtra (महाराष्ट्र)</option>
+                            <option value="Manipur">Manipur (मणिपुर)</option>
+                            <option value="Meghalaya">Meghalaya (मेघालय)</option>
+                            <option value="Mizoram">Mizoram (मिज़ोरम)</option>
+                            <option value="Nagaland">Nagaland (नागालैंड)</option>
+                            <option value="Odisha">Odisha (ओडिशा)</option>
+                            <option value="Punjab">Punjab (पंजाब)</option>
+                            <option value="Rajasthan">Rajasthan (राजस्थान)</option>
+                            <option value="Sikkim">Sikkim (सिक्किम)</option>
+                            <option value="Tamil Nadu">Tamil Nadu (तमिल नाडु)</option>
+                            <option value="Telangana">Telangana (तेलंगाना)</option>
+                            <option value="Tripura">Tripura (त्रिपुरा)</option>
+                            <option value="Uttar Pradesh">Uttar Pradesh (उत्तर प्रदेश)</option>
+                            <option value="Uttarakhand">Uttarakhand (उत्तराखंड)</option>
+                            <option value="West Bengal">West Bengal (पश्चिम बंगाल)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="button" onclick="findNearestMandis(event)"
+                    class="w-full bg-amber-500 text-white py-3 rounded-xl font-semibold text-base hover:bg-amber-600 active:scale-95 transition-all mb-2 shadow">
+                    📍 <span data-i18n="mandi.nearestBtn">Find Nearest Mandis (GPS)</span>
+                </button>
+
+                <button type="button" onclick="testMandi(event)"
+                    class="w-full bg-green-700 text-white py-3 rounded-xl font-semibold text-base hover:bg-green-800 active:scale-95 transition-all mb-3"
+                    data-i18n="mandi.getBtn">Get Mandi Prices</button>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs text-gray-500" data-i18n="mandi.orLocation">Or detect state from GPS:</span>
+                    <button type="button" onclick="getMandiByLocation(event)"
+                        class="bg-white border border-green-600 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-50">
+                        📍 <span data-i18n="mandi.useLocation">Use my location</span>
+                    </button>
+                    <span id="mandiDetectedLoc" class="text-xs text-green-700 hidden"></span>
+                </div>
+
+                <div id="mandiResult" class="mt-4 hidden"></div>
+            </div>
+        </div>
+
+        <!-- 5. SARKARI YOJANA -->
+        <div id="page-yojana" class="page-section hidden">
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6">
+                <div class="flex items-start justify-between gap-3 mb-1">
+                    <h2 class="text-xl font-bold text-green-700">🏛️ <span data-i18n="yojana.title">Government Schemes</span></h2>
+                    <button type="button" id="yojanaVoiceBtn" onclick="toggleYojanaVoice(event)"
+                        data-i18n-title="yojana.voiceTitle"
+                        title="Read scheme answers aloud"
+                        class="shrink-0 inline-flex items-center gap-1 bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-green-700 active:scale-95 transition-all shadow-sm">
+                        <span id="yojanaVoiceIcon">🔊</span>
+                        <span id="yojanaVoiceLabel" data-i18n="yojana.voiceOn">Voice Reply: ON</span>
+                    </button>
+                </div>
+                <p class="text-gray-500 text-sm mb-4" data-i18n="yojana.subtitle">Select a scheme and state — get verified, step-by-step information.</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <!-- Scheme dropdown -->
+                    <div class="sm:col-span-2">
+                        <label class="text-sm font-medium text-gray-700 mb-1 block">🏛️ <span data-i18n="yojana.schemeLabel">Select Scheme</span></label>
+                        <select id="yojanaScheme"
+                            class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-green-400 focus:outline-none"
+                            onchange="onYojanaSchemeChange()">
+                            <option value="" data-i18n="yojana.schemePlaceholder">-- Select a Scheme --</option>
+                            <option value="PM-KISAN">🌾 PM-KISAN (पीएम-किसान) — ₹6000/year direct benefit</option>
+                            <option value="PMFBY">🛡️ PM Fasal Bima Yojana (पीएम फसल बीमा योजना) — Crop insurance</option>
+                            <option value="Kisan Credit Card">💳 Kisan Credit Card / KCC (किसान क्रेडिट कार्ड) — Farm loan at 4%</option>
+                            <option value="PMKSY drip sprinkler">💧 PM Krishi Sinchayee Yojana (पीएम कृषि सिंचाई योजना) — Irrigation subsidy</option>
+                            <option value="Soil Health Card">🌱 Soil Health Card (मृदा स्वास्थ्य कार्ड) — Free soil testing</option>
+                            <option value="eNAM">📊 eNAM (ई-नाम) — Online mandi & best price</option>
+                            <option value="PM Kisan Maan-Dhan pension">👴 PM Kisan Maan-Dhan (पीएम किसान मान-धन) — ₹3000/month pension</option>
+                            <option value="PKVY organic farming">🌿 PKVY (परंपरागत कृषि विकास योजना) — Organic farming support</option>
+                            <option value="Kisan Vikas Patra">📮 Kisan Vikas Patra (किसान विकास पत्र) — Investment doubling</option>
+                            <option value="MGNREGA farm pond">🏗️ MGNREGA (मनरेगा) — Guaranteed wage + farm work</option>
+                        </select>
+                    </div>
+
+                    <!-- State dropdown -->
+                    <div class="sm:col-span-2">
+                        <label class="text-sm font-medium text-gray-700 mb-1 block">📍 <span data-i18n="yojana.stateLabel">State (optional)</span></label>
+                        <select id="yojanaState"
+                            class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-green-400 focus:outline-none">
+                            <option value="" data-i18n="yojana.stateDefault">-- All States --</option>
+                            <option value="Andhra Pradesh">Andhra Pradesh (आंध्र प्रदेश)</option>
+                            <option value="Arunachal Pradesh">Arunachal Pradesh (अरुणाचल प्रदेश)</option>
+                            <option value="Assam">Assam (असम)</option>
+                            <option value="Bihar">Bihar (बिहार)</option>
+                            <option value="Chhattisgarh">Chhattisgarh (छत्तीसगढ़)</option>
+                            <option value="Goa">Goa (गोवा)</option>
+                            <option value="Gujarat">Gujarat (गुजरात)</option>
+                            <option value="Haryana">Haryana (हरियाणा)</option>
+                            <option value="Himachal Pradesh">Himachal Pradesh (हिमाचल प्रदेश)</option>
+                            <option value="Jharkhand">Jharkhand (झारखंड)</option>
+                            <option value="Karnataka">Karnataka (कर्नाटक)</option>
+                            <option value="Kerala">Kerala (केरल)</option>
+                            <option value="Madhya Pradesh">Madhya Pradesh (मध्य प्रदेश)</option>
+                            <option value="Maharashtra">Maharashtra (महाराष्ट्र)</option>
+                            <option value="Manipur">Manipur (मणिपुर)</option>
+                            <option value="Meghalaya">Meghalaya (मेघालय)</option>
+                            <option value="Mizoram">Mizoram (मिज़ोरम)</option>
+                            <option value="Nagaland">Nagaland (नागालैंड)</option>
+                            <option value="Odisha">Odisha (ओडिशा)</option>
+                            <option value="Punjab">Punjab (पंजाब)</option>
+                            <option value="Rajasthan">Rajasthan (राजस्थान)</option>
+                            <option value="Sikkim">Sikkim (सिक्किम)</option>
+                            <option value="Tamil Nadu">Tamil Nadu (तमिल नाडु)</option>
+                            <option value="Telangana">Telangana (तेलंगाना)</option>
+                            <option value="Tripura">Tripura (त्रिपुरा)</option>
+                            <option value="Uttar Pradesh">Uttar Pradesh (उत्तर प्रदेश)</option>
+                            <option value="Uttarakhand">Uttarakhand (उत्तराखंड)</option>
+                            <option value="West Bengal">West Bengal (पश्चिम बंगाल)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Custom query (collapsed by default, expands when "Other" or typing needed) -->
+                <div id="yojanaCustomWrap" class="mb-3 hidden">
+                    <label class="text-sm font-medium text-gray-700 mb-1 block" data-i18n="yojana.queryLabel">Or type your own question</label>
+                    <div class="flex gap-2">
+                        <input id="yojanaQuery" type="text"
+                            data-i18n-placeholder="yojana.queryPlaceholder"
+                            placeholder="e.g. How to apply for PM-KISAN"
+                            class="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-400 focus:outline-none"/>
+                        <button type="button" id="yojanaMicBtn"
+                            onclick="toggleYojanaMic(event)"
+                            data-i18n-title="chat.micTitle"
+                            title="Speak to type"
+                            class="bg-white border border-green-600 text-green-700 px-3 py-2 rounded-lg hover:bg-green-50">🎤</button>
+                    </div>
+                    <p id="yojanaMicStatus" class="text-xs text-gray-500 mt-1 hidden"></p>
+                </div>
+                <button type="button" onclick="toggleYojanaCustom()"
+                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white border-2 border-green-600 text-green-700 px-4 py-2 rounded-xl text-sm font-semibold mb-3 hover:bg-green-50 active:scale-95 transition-all shadow-sm"
+                    data-i18n="yojana.customToggle">
+                    ✏️ Type a custom question instead
+                </button>
+
+                <button type="button" onclick="testYojana(event)"
+                    class="w-full bg-green-700 text-white py-3 rounded-xl font-semibold text-base hover:bg-green-800 active:scale-95 transition-all"
+                    data-i18n="yojana.getBtn">Get Scheme Info</button>
+
+                <div id="yojanaResult" class="mt-4 hidden"></div>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    // ─────────────────────────────────────────
+    // GLOBAL SAFETY NET — never let an uncaught error blank the page
+    // (critical for live presentations / demos)
+    // ─────────────────────────────────────────
+    (function installGlobalSafetyNet() {
+        function showErrorToast(msg) {
+            try {
+                let toast = document.getElementById("__kmErrorToast");
+                if (!toast) {
+                    toast = document.createElement("div");
+                    toast.id = "__kmErrorToast";
+                    toast.style.cssText =
+                        "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);" +
+                        "background:#fef2f2;color:#991b1b;border:1px solid #fecaca;" +
+                        "padding:8px 14px;border-radius:9999px;font-size:13px;z-index:99999;" +
+                        "box-shadow:0 4px 12px rgba(0,0,0,.12);max-width:90vw;text-align:center;" +
+                        "transition:opacity .3s;";
+                    document.body && document.body.appendChild(toast);
+                }
+                toast.textContent = "⚠️ " + (msg || "Something went wrong, please try again.");
+                toast.style.opacity = "1";
+                clearTimeout(toast._t);
+                toast._t = setTimeout(() => { toast.style.opacity = "0"; }, 4000);
+            } catch(_) { /* never throw from the safety net */ }
+        }
+        window.addEventListener("error", function(e) {
+            try { console.warn("[KM safety-net] error:", e && e.message); } catch(_) {}
+            showErrorToast("A small glitch was caught — the app is still running.");
+            return true; // prevent default browser error UI
+        });
+        window.addEventListener("unhandledrejection", function(e) {
+            try { console.warn("[KM safety-net] unhandled promise:", e && (e.reason && e.reason.message || e.reason)); } catch(_) {}
+            showErrorToast("Network hiccup — please try again.");
+            try { e.preventDefault(); } catch(_) {}
+        });
+        // Expose for renderers / handlers to use
+        window.__kmToast = showErrorToast;
+    })();
+
+    const BASE_URL = "";
+    let currentTab = "soil";
+
+    // Voice / speaker state — declared early so i18n can read them
+    let voiceLang = "hi-IN";        // default Hindi
+    let speakerOn = false;          // off by default — user must opt in
+    let yojanaVoiceOn = true;       // schemes-tab voice reply, ON by default
+
+    // ─────────────────────────────────────────
+    // i18n — UI translations (Hindi / English)
+    // ─────────────────────────────────────────
+    const STRINGS = {
+        en: {
+            "hdr.title": "KisanMind",
+            "hdr.tagline": "AI-Powered Farmer Assistant",
+            "hdr.autoRead": "Auto-Read",
+            "hdr.autoReadOn": "Auto-Read ON",
+            "hdr.autoReadTitle": "Read replies aloud",
+            "voice.stop": "Stop Voice",
+            "voice.stopTitle": "Stop reading aloud",
+
+            "nav.soil": "Soil",
+            "nav.chat": "Chat",
+            "nav.doctor": "Disease Detection",
+            "nav.mandi": "Mandi",
+            "nav.yojana": "Schemes",
+
+            "weather.title": "Weather",
+            "weather.cityPlaceholder": "City e.g. Lucknow",
+            "weather.search": "Search",
+            "weather.myLocation": "My Location",
+            "weather.myLocationTitle": "Use my location",
+            "weather.summaryRain": "Rain chance in next 24 hours: ",
+            "weather.summaryNoRain": "No major rain expected in the next 24 hours.",
+            "weather.feelsLike": "feels",
+            "weather.humidity": "Humidity",
+            "weather.wind": "Wind",
+            "weather.errorPrefix": "Error: ",
+
+            "soil.title": "Soil Sense Agent",
+            "soil.subtitle": "Enter your soil details to get the best crop, fertilizer and irrigation schedule.",
+            "soil.autofill": "Auto-fill from my location",
+            "soil.N": "Nitrogen (N)",
+            "soil.P": "Phosphorus (P)",
+            "soil.K": "Potassium (K)",
+            "soil.temp": "Temperature (°C)",
+            "soil.humidity": "Humidity (%)",
+            "soil.ph": "Soil pH",
+            "soil.rainfall": "Rainfall (mm)",
+            "soil.getBtn": "Get Recommendation",
+            "soil.recommended": "✅ Recommended Crop: ",
+            "soil.realData": "✅ Real data: ",
+            "soil.note": "Temperature, humidity and pH are real data. N/P/K and rainfall are typical Indian averages — adjust based on your soil test.",
+            "soil.detectingLocation": "📍 Detecting your location...",
+            "soil.fetching": "⏳ Fetching weather and soil information...",
+            "soil.geoUnsupported": "Geolocation not supported in this browser.",
+            "soil.locationDenied": "Location denied: ",
+
+            "region.title": "Region-Based Crop Suggestions",
+            "region.subtitle": "Type your city (English or Hindi) or use GPS — get the soil type and best crops for your state.",
+            "region.cityLabel": "City / Town",
+            "region.cityPlaceholder": "e.g. Indore / इंदौर",
+            "region.getBtn": "🌾 Get Region Advice",
+            "region.useLocation": "📍 Use My Location",
+            "region.fetching": "⏳ Looking up region data...",
+            "region.locating": "📍 Detecting your location...",
+            "region.cardLocation": "📍 Location",
+            "region.cardSoil": "🌱 Soil Type",
+            "region.cardKharif": "🌾 Kharif (Monsoon) Crops",
+            "region.cardRabi": "🌿 Rabi (Winter) Crops",
+            "region.cardZaid": "🌻 Zaid (Summer) Crops",
+            "region.cardAdvice": "💡 Practical Advice",
+            "region.none": "—",
+            "region.gpsManualFallback": "Couldn't read your location. Please enter your city manually.",
+
+            "chat.title": "Kisan Chatbot",
+            "chat.subtitle": "Ask anything about farming — answers in your selected language.",
+            "chat.placeholder": "Type your question or press 🎤...",
+            "chat.send": "Send",
+            "chat.reset": "Reset",
+            "chat.micTitle": "Speak to type",
+            "chat.speakerTitle": "Read replies aloud",
+            "chat.listening": "🎤 Listening... please speak",
+            "chat.micUnsupported": "Voice input is not supported in this browser.",
+
+            "disease.title": "Disease Detection",
+            "disease.subtitle": "Select your crop, upload a photo — get instant diagnosis in your language.",
+            "disease.cropLabel": "Select Crop",
+            "disease.cropDefault": "-- Select Crop (optional) --",
+            "disease.langLabel": "Reply Language",
+            "disease.uploadLabel": "Upload crop / leaf photo",
+            "disease.instruction": "Upload a clear image of the affected plant leaf",
+            "disease.detectBtn": "🔬 Scan Crop",
+            "disease.scanning": "Scanning... please wait",
+            "disease.noImage": "Please select a photo first!",
+            "disease.cardDisease": "🌿 Disease Name",
+            "disease.cardCause": "⚠️ Cause",
+            "disease.cardSolution": "💊 Solution",
+            "disease.cardTreatment": "💊 Treatment Type",
+            "disease.cardOrganic": "🌱 Organic Solution",
+            "disease.cardChemical": "🧪 Chemical Solution",
+            "disease.cardPrevention": "🛡️ Prevention",
+            "disease.healthy": "No disease detected — crop appears healthy ✅",
+            "disease.findShops": "📍 Find Fertilizer Near Me",
+            "disease.askCity": "Please enter your city to find nearby shops:",
+            "disease.locating": "Finding nearby shops...",
+
+            "mandi.title": "Mandi Prices",
+            "mandi.subtitle": "Live mandi prices and selling advice.",
+            "mandi.commodity": "Crop",
+            "mandi.selectCrop": "-- Select Crop --",
+            "mandi.state": "State",
+            "mandi.selectState": "-- Select State --",
+            "mandi.getBtn": "💰 Get Mandi Prices",
+            "mandi.orLocation": "Or detect state from GPS:",
+            "mandi.useLocation": "Use my location",
+            "mandi.fetching": "Fetching mandi prices...",
+            "mandi.detected": "📍 Detected: ",
+            "mandi.noCommodity": "Please select a crop first.",
+            "mandi.noState": "Please select a state.",
+            "mandi.liveTitle": "📊 Live Mandi Prices",
+            "mandi.noLive": "Live data not available — showing AI advice only.",
+            "mandi.adviceTitle": "💡 Selling Advice",
+            "mandi.perQuintal": "per quintal",
+            "mandi.insightTitle": "📊 Price Insight",
+            "mandi.trendTitle": "📈 Price Trend",
+            "mandi.trendVs": "vs last check",
+            "mandi.cropLabel": "Crop",
+            "mandi.marketLabel": "Market",
+            "mandi.priceLabel": "Price (Modal)",
+            "mandi.bestPrice": "Best price",
+            "mandi.nearestBtn": "📍 Find Nearest Mandis (GPS)",
+            "mandi.nearestTitle": "📍 Nearest Mandis to You",
+            "mandi.nearestFinding": "Finding nearest mandis...",
+            "mandi.distanceLabel": "Distance",
+            "mandi.bestRecommend": "✅ Best Mandi to Sell",
+            "mandi.avgPrice": "Average Price",
+            "mandi.chartTitle": "📊 Price Comparison (₹/quintal)",
+            "mandi.chartModal": "Modal Price",
+            "mandi.chartMin": "Min Price",
+            "mandi.chartMax": "Max Price",
+            "mandi.dataSource": "Data source",
+            "mandi.estimatedNote": "Live prices unavailable — showing estimated prices based on recent trends.",
+            "mandi.mixedNote": "Mix of live mandi prices and estimates where live data was missing.",
+            "mandi.noGps": "Location not supported on this device. Please use the State dropdown instead.",
+            "mandi.gpsDenied": "Location permission denied. Please enable location and try again.",
+
+            "yojana.title": "Government Schemes",
+            "yojana.subtitle": "Select a scheme and state — get verified, step-by-step information.",
+            "yojana.schemeLabel": "Select Scheme",
+            "yojana.schemePlaceholder": "-- Select a Scheme --",
+            "yojana.stateLabel": "State (optional)",
+            "yojana.stateDefault": "-- All States --",
+            "yojana.queryLabel": "Or type your own question",
+            "yojana.queryPlaceholder": "e.g. How to apply for PM-KISAN",
+            "yojana.customToggle": "✏️ Type a custom question instead",
+            "yojana.getBtn": "🏛️ Get Scheme Info",
+            "yojana.fetching": "Looking up the information...",
+            "yojana.noScheme": "Please select a scheme or type a custom question.",
+            "yojana.apply": "Apply / Learn More",
+            "yojana.eligibility": "Eligibility",
+            "yojana.benefits": "Benefits",
+            "yojana.steps": "How to Apply",
+            "yojana.voiceTitle": "Read scheme answers aloud",
+            "yojana.voiceOn": "Voice Reply: ON",
+            "yojana.voiceOff": "Voice Reply: OFF",
+
+            "result.listen": "🔊 Listen",
+            "result.error": "Error: ",
+            "result.network": "Network error. Please check your connection and try again.",
+            "result.empty": "No response received from server.",
+            "common.loading": "Loading...",
+            "voice.speed": "Speed",
+            "voice.speedSlow": "Slow",
+            "voice.speedNormal": "Normal",
+            "voice.speedFast": "Fast",
+
+            "profile.openBtn": "My Profile",
+            "profile.openTitle": "My farm profile",
+            "profile.modalTitle": "My Farm Profile",
+            "profile.help": "Save your farm details once — we'll auto-fill them across Weather, Region Soil, Mandi, Disease and Schemes.",
+            "profile.cityLabel": "City / Town",
+            "profile.cityPlaceholder": "e.g. Indore / इंदौर",
+            "profile.stateLabel": "State",
+            "profile.statePlaceholder": "-- Select State --",
+            "profile.cropLabel": "Main Crop",
+            "profile.cropPlaceholder": "-- Select Main Crop --",
+            "profile.saveBtn": "💾 Save Profile",
+            "profile.clearBtn": "Clear",
+            "profile.saved": "✅ Profile saved — auto-filled across the app.",
+            "profile.cleared": "Profile cleared.",
+            "profile.empty": "Please fill at least one field before saving."
+        },
+        hi: {
+            "hdr.title": "किसानमाइंड",
+            "hdr.tagline": "एआई-संचालित किसान सहायक",
+            "hdr.autoRead": "स्वतः-पठन",
+            "voice.stop": "आवाज़ रोकें",
+            "voice.stopTitle": "ज़ोर से पढ़ना रोकें",
+            "hdr.autoReadOn": "स्वतः-पठन चालू",
+            "hdr.autoReadTitle": "जवाब अपने आप सुनिए",
+
+            "nav.soil": "मिट्टी",
+            "nav.chat": "चैट",
+            "nav.doctor": "रोग पहचान",
+            "nav.mandi": "मंडी",
+            "nav.yojana": "योजना",
+
+            "weather.title": "मौसम",
+            "weather.cityPlaceholder": "शहर जैसे लखनऊ",
+            "weather.search": "खोजें",
+            "weather.myLocation": "मेरी लोकेशन",
+            "weather.myLocationTitle": "मेरी लोकेशन से देखें",
+            "weather.summaryRain": "अगले 24 घंटे में बारिश की संभावना: ",
+            "weather.summaryNoRain": "अगले 24 घंटे में बारिश की कोई बड़ी संभावना नहीं है।",
+            "weather.feelsLike": "महसूस",
+            "weather.humidity": "नमी",
+            "weather.wind": "हवा",
+            "weather.errorPrefix": "त्रुटि: ",
+
+            "soil.title": "मिट्टी सेन्स एजेंट",
+            "soil.subtitle": "अपनी मिट्टी की जानकारी दें — सबसे अच्छी फसल, खाद और सिंचाई का समय बताएँगे।",
+            "soil.autofill": "मेरी लोकेशन से भरें",
+            "soil.N": "नाइट्रोजन (N)",
+            "soil.P": "फॉस्फोरस (P)",
+            "soil.K": "पोटैशियम (K)",
+            "soil.temp": "तापमान (°C)",
+            "soil.humidity": "नमी (%)",
+            "soil.ph": "मिट्टी का pH",
+            "soil.rainfall": "वर्षा (मिमी)",
+            "soil.getBtn": "सिफारिश प्राप्त करें",
+            "soil.recommended": "✅ सुझाई गई फसल: ",
+            "soil.realData": "✅ वास्तविक डेटा: ",
+            "soil.note": "तापमान, नमी और pH असली डेटा हैं। N/P/K और वर्षा भारत की सामान्य औसत हैं — अपनी मिट्टी जाँच के अनुसार बदलें।",
+            "soil.detectingLocation": "📍 आपकी लोकेशन का पता लगाया जा रहा है...",
+            "soil.fetching": "⏳ मौसम और मिट्टी की जानकारी ली जा रही है...",
+            "soil.geoUnsupported": "इस ब्राउज़र में लोकेशन समर्थित नहीं है।",
+            "soil.locationDenied": "लोकेशन अनुमति नहीं मिली: ",
+
+            "region.title": "क्षेत्र-आधारित फसल सुझाव",
+            "region.subtitle": "अपने शहर का नाम लिखें (हिंदी या English) या GPS दबाएँ — आपके राज्य के लिए मिट्टी और सबसे अच्छी फसलें देखें।",
+            "region.cityLabel": "शहर / कस्बा",
+            "region.cityPlaceholder": "जैसे इंदौर / Indore",
+            "region.getBtn": "🌾 क्षेत्र की सलाह पाएँ",
+            "region.useLocation": "📍 मेरी लोकेशन से देखें",
+            "region.fetching": "⏳ क्षेत्र की जानकारी ली जा रही है...",
+            "region.locating": "📍 आपकी लोकेशन का पता लगाया जा रहा है...",
+            "region.cardLocation": "📍 स्थान",
+            "region.cardSoil": "🌱 मिट्टी का प्रकार",
+            "region.cardKharif": "🌾 खरीफ (बरसात) फसलें",
+            "region.cardRabi": "🌿 रबी (सर्दी) फसलें",
+            "region.cardZaid": "🌻 ज़ायद (गर्मी) फसलें",
+            "region.cardAdvice": "💡 व्यावहारिक सलाह",
+            "region.none": "—",
+            "region.gpsManualFallback": "लोकेशन नहीं मिली। कृपया अपना शहर लिखें।",
+
+            "chat.title": "किसान चैटबोट",
+            "chat.subtitle": "खेती से जुड़ा कोई भी सवाल पूछें — आपकी चुनी हुई भाषा में जवाब मिलेगा।",
+            "chat.placeholder": "अपना सवाल लिखें या 🎤 दबाएँ...",
+            "chat.send": "भेजें",
+            "chat.reset": "रीसेट",
+            "chat.micTitle": "बोलकर लिखें",
+            "chat.speakerTitle": "जवाब ज़ोर से सुनें",
+            "chat.listening": "🎤 सुन रहा हूँ... अब बोलिए",
+            "chat.micUnsupported": "इस ब्राउज़र में आवाज़ इनपुट उपलब्ध नहीं है।",
+
+            "disease.title": "रोग पहचान",
+            "disease.subtitle": "फसल चुनें, तस्वीर अपलोड करें — अपनी भाषा में तुरंत जाँच पाएँ।",
+            "disease.cropLabel": "फसल चुनें",
+            "disease.cropDefault": "-- फसल चुनें (वैकल्पिक) --",
+            "disease.langLabel": "जवाब की भाषा",
+            "disease.uploadLabel": "फसल / पत्ती की तस्वीर अपलोड करें",
+            "disease.instruction": "कृपया पौधे की प्रभावित पत्ती की साफ फोटो अपलोड करें",
+            "disease.detectBtn": "🔬 फसल स्कैन करें",
+            "disease.scanning": "जांच की जा रही है... कृपया प्रतीक्षा करें",
+            "disease.noImage": "पहले एक तस्वीर चुनें!",
+            "disease.cardDisease": "🌿 रोग का नाम",
+            "disease.cardCause": "⚠️ कारण",
+            "disease.cardSolution": "💊 समाधान",
+            "disease.cardTreatment": "💊 उपचार का प्रकार",
+            "disease.cardOrganic": "🌱 जैविक उपाय",
+            "disease.cardChemical": "🧪 रासायनिक उपाय",
+            "disease.cardPrevention": "🛡️ बचाव",
+            "disease.healthy": "कोई रोग नहीं मिला — फसल स्वस्थ दिखती है ✅",
+            "disease.findShops": "📍 नजदीकी खाद की दुकान खोजें",
+            "disease.askCity": "नज़दीकी दुकान खोजने के लिए अपना शहर लिखें:",
+            "disease.locating": "नज़दीकी दुकानें खोजी जा रही हैं...",
+
+            "mandi.title": "मंडी भाव",
+            "mandi.subtitle": "लाइव मंडी कीमतें और बेचने की सलाह।",
+            "mandi.commodity": "फसल",
+            "mandi.selectCrop": "-- फसल चुनें --",
+            "mandi.state": "राज्य",
+            "mandi.selectState": "-- राज्य चुनें --",
+            "mandi.getBtn": "💰 मंडी कीमतें देखें",
+            "mandi.orLocation": "या GPS से राज्य जानें:",
+            "mandi.useLocation": "मेरी लोकेशन से देखें",
+            "mandi.fetching": "मंडी कीमतें ली जा रही हैं...",
+            "mandi.detected": "📍 पता चला: ",
+            "mandi.noCommodity": "पहले फसल चुनें।",
+            "mandi.noState": "पहले राज्य चुनें।",
+            "mandi.liveTitle": "📊 लाइव मंडी भाव",
+            "mandi.noLive": "लाइव डेटा उपलब्ध नहीं — AI सलाह दिखाई जा रही है।",
+            "mandi.adviceTitle": "💡 बेचने की सलाह",
+            "mandi.perQuintal": "प्रति क्विंटल",
+            "mandi.insightTitle": "📊 कीमत संकेत",
+            "mandi.trendTitle": "📈 कीमत का रुझान",
+            "mandi.trendVs": "पिछली जाँच की तुलना में",
+            "mandi.cropLabel": "फसल",
+            "mandi.marketLabel": "मंडी",
+            "mandi.priceLabel": "भाव (मोडल)",
+            "mandi.bestPrice": "सबसे अच्छा भाव",
+            "mandi.nearestBtn": "📍 पास की मंडियाँ खोजें (GPS)",
+            "mandi.nearestTitle": "📍 आपके पास की मंडियाँ",
+            "mandi.nearestFinding": "पास की मंडियाँ ढूँढी जा रही हैं...",
+            "mandi.distanceLabel": "दूरी",
+            "mandi.bestRecommend": "✅ बेचने के लिए सबसे अच्छी मंडी",
+            "mandi.avgPrice": "औसत भाव",
+            "mandi.chartTitle": "📊 भाव की तुलना (₹/क्विंटल)",
+            "mandi.chartModal": "मोडल भाव",
+            "mandi.chartMin": "न्यूनतम भाव",
+            "mandi.chartMax": "अधिकतम भाव",
+            "mandi.dataSource": "डेटा स्रोत",
+            "mandi.estimatedNote": "लाइव भाव उपलब्ध नहीं — हाल के रुझान पर आधारित अनुमानित भाव दिखाए जा रहे हैं।",
+            "mandi.mixedNote": "कुछ लाइव मंडी भाव और कुछ अनुमानित (जहाँ लाइव डेटा नहीं था)।",
+            "mandi.noGps": "इस डिवाइस पर लोकेशन सपोर्ट नहीं — कृपया राज्य चुनें।",
+            "mandi.gpsDenied": "लोकेशन की अनुमति नहीं मिली। कृपया अनुमति देकर पुनः प्रयास करें।",
+
+            "yojana.title": "सरकारी योजना",
+            "yojana.subtitle": "योजना और राज्य चुनें — सत्यापित, चरणबद्ध जानकारी पाएँ।",
+            "yojana.schemeLabel": "योजना चुनें",
+            "yojana.schemePlaceholder": "-- योजना चुनें --",
+            "yojana.stateLabel": "राज्य (वैकल्पिक)",
+            "yojana.stateDefault": "-- सभी राज्य --",
+            "yojana.queryLabel": "या अपना सवाल लिखें",
+            "yojana.queryPlaceholder": "जैसे पीएम-किसान में आवेदन कैसे करें",
+            "yojana.customToggle": "✏️ अपना सवाल लिखें",
+            "yojana.getBtn": "🏛️ योजना की जानकारी लें",
+            "yojana.fetching": "जानकारी खोजी जा रही है...",
+            "yojana.noScheme": "कृपया कोई योजना चुनें या अपना सवाल लिखें।",
+            "yojana.apply": "आवेदन करें / और जानें",
+            "yojana.eligibility": "पात्रता",
+            "yojana.benefits": "लाभ",
+            "yojana.steps": "आवेदन कैसे करें",
+            "yojana.voiceTitle": "योजना का जवाब आवाज़ में सुनें",
+            "yojana.voiceOn": "आवाज़ उत्तर: चालू",
+            "yojana.voiceOff": "आवाज़ उत्तर: बंद",
+
+            "result.listen": "🔊 सुनें",
+            "result.error": "त्रुटि: ",
+            "result.network": "नेटवर्क समस्या। अपना इंटरनेट कनेक्शन जाँचकर फिर से कोशिश करें।",
+            "result.empty": "सर्वर से कोई जवाब नहीं मिला।",
+            "common.loading": "लोड हो रहा है...",
+            "voice.speed": "गति",
+            "voice.speedSlow": "धीमी",
+            "voice.speedNormal": "सामान्य",
+            "voice.speedFast": "तेज़",
+
+            "profile.openBtn": "मेरा प्रोफ़ाइल",
+            "profile.openTitle": "मेरा कृषि प्रोफ़ाइल",
+            "profile.modalTitle": "मेरा कृषि प्रोफ़ाइल",
+            "profile.help": "एक बार अपनी जानकारी सहेजें — मौसम, क्षेत्र-मिट्टी, मंडी, रोग और योजना में अपने आप भर जाएगी।",
+            "profile.cityLabel": "शहर / कस्बा",
+            "profile.cityPlaceholder": "जैसे इंदौर / Indore",
+            "profile.stateLabel": "राज्य",
+            "profile.statePlaceholder": "-- राज्य चुनें --",
+            "profile.cropLabel": "मुख्य फसल",
+            "profile.cropPlaceholder": "-- मुख्य फसल चुनें --",
+            "profile.saveBtn": "💾 प्रोफ़ाइल सहेजें",
+            "profile.clearBtn": "हटाएँ",
+            "profile.saved": "✅ प्रोफ़ाइल सहेज ली — पूरे ऐप में अपने आप भर दी।",
+            "profile.cleared": "प्रोफ़ाइल हटा दी।",
+            "profile.empty": "सहेजने से पहले कम-से-कम एक खाना भरें।"
+        }
+    };
+
+    function getUiLang() {
+        return (voiceLang || "hi-IN").startsWith("en") ? "en" : "hi";
+    }
+    function getApiLang() {
+        return getUiLang();
+    }
+    function t(key) {
+        const lang = getUiLang();
+        return (STRINGS[lang] && STRINGS[lang][key]) || (STRINGS.en && STRINGS.en[key]) || key;
+    }
+
+    function applyI18n() {
+        document.documentElement.setAttribute("lang", getUiLang());
+        document.querySelectorAll("[data-i18n]").forEach(el => {
+            const key = el.getAttribute("data-i18n");
+            el.textContent = t(key);
+        });
+        document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+            const key = el.getAttribute("data-i18n-placeholder");
+            el.setAttribute("placeholder", t(key));
+        });
+        document.querySelectorAll("[data-i18n-title]").forEach(el => {
+            const key = el.getAttribute("data-i18n-title");
+            el.setAttribute("title", t(key));
+        });
+        // Refresh the speaker button text to match current language
+        const globalBtn = document.getElementById("globalSpeakerBtn");
+        if (globalBtn) {
+            const label = speakerOn ? t("hdr.autoReadOn") : t("hdr.autoRead");
+            globalBtn.innerHTML = (speakerOn ? "🔊 " : "🔈 ") + label;
+        }
+        // Refresh the yojana voice toggle so its ON/OFF label reflects current state + language
+        if (typeof refreshYojanaVoiceBtn === "function") refreshYojanaVoiceBtn();
+    }
+
+    // Tab switching
+    function showTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll(".page-section").forEach(el => el.classList.add("hidden"));
+        document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("bg-green-900"));
+        document.getElementById("page-" + tab).classList.remove("hidden");
+        document.getElementById("tab-" + tab).classList.add("bg-green-900");
+    }
+
+    // Stores the plain-text body of each result panel so the Listen button can replay it
+    const _resultStore = {};
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    // Show result helper — adds a Listen button + auto-reads aloud when speaker is on
+    function showResult(elementId, content, isError=false) {
+        const el = document.getElementById(elementId);
+        el.classList.remove("hidden");
+        el.className = `mt-4 p-4 rounded-lg text-sm ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-900'}`;
+        const text = String(content == null ? "" : content);
+        _resultStore[elementId] = text;
+        const safe = escapeHtml(text);
+        const listenBtn = isError ? '' : `
+            <div class="flex justify-end mb-2">
+                <button type="button" onclick="playResult('${elementId}', event)"
+                    title="Sunें / Listen"
+                    class="bg-white border border-green-600 text-green-700 px-2 py-1 rounded text-xs hover:bg-green-50">
+                    🔊 Sunें / Listen
+                </button>
+            </div>`;
+        el.innerHTML = `${listenBtn}<div class="whitespace-pre-wrap">${safe}</div>`;
+        if (!isError) autoSpeak(text);
+    }
+
+    // Manually replay a result aloud (always speaks, even if auto-read is off).
+    // Routed through speakReply so the floating Stop-Voice button and the
+    // auto-stop timer apply consistently.
+    function playResult(elementId, event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const text = _resultStore[elementId];
+        if (text) speakReply(text);
+    }
+
+    // Loading state helper
+    function setLoading(elementId, message="Loading...") {
+        const el = document.getElementById(elementId);
+        el.classList.remove("hidden");
+        el.className = "mt-4 p-4 rounded-lg bg-yellow-50 text-yellow-700 text-sm";
+        el.innerText = "⏳ " + message;
+    }
+
+    // Button disable/enable helpers to prevent double-submission
+    function disableBtn(btn) {
+        if (!btn) return;
+        btn._origText = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add("opacity-60", "cursor-not-allowed");
+    }
+    function enableBtn(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        btn.classList.remove("opacity-60", "cursor-not-allowed");
+        if (btn._origText !== undefined) btn.innerHTML = btn._origText;
+    }
+
+    // Unified fetch helper — robust against:
+    //  - network failures (offline, DNS, timeouts)
+    //  - non-JSON responses (proxy error pages, server crashes returning HTML)
+    //  - non-2xx HTTP codes
+    // Always throws an Error with a friendly, user-facing message so call
+    // sites can simply show e.message — the page will never break on render
+    // because of an unparseable response.
+    async function apiFetch(url, options) {
+        let res;
+        try {
+            res = await fetch(url, options);
+        } catch (netErr) {
+            // Network-level failure — server unreachable, offline, etc.
+            throw new Error(t("result.network") || "Network error. Please check your connection and try again.");
+        }
+        const ctype = (res.headers.get("content-type") || "").toLowerCase();
+        let data = null;
+        if (ctype.includes("application/json")) {
+            try { data = await res.json(); }
+            catch (_) { data = null; }
+        } else {
+            // Non-JSON body (e.g. HTML proxy error page) — read as text but
+            // don't surface raw HTML to the user.
+            try { await res.text(); } catch (_) {}
+        }
+        if (!res.ok) {
+            const msg = (data && data.error) || `Server error ${res.status}`;
+            throw new Error(msg);
+        }
+        // 2xx but body wasn't JSON — treat as empty success object so call
+        // sites can degrade gracefully instead of crashing.
+        return data || {};
+    }
+
+    // 1. Soil Agent
+    async function testSoil(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Validate all fields before sending
+        const fields = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"];
+        for (const f of fields) {
+            const v = document.getElementById(f).value.trim();
+            if (v === "" || isNaN(parseFloat(v))) {
+                showResult("soilResult", t("result.error") + `Please fill in "${f}" with a valid number.`, true);
+                document.getElementById(f).focus();
+                return;
+            }
+        }
+
+        const payload = {
+            N:           parseFloat(document.getElementById("N").value),
+            P:           parseFloat(document.getElementById("P").value),
+            K:           parseFloat(document.getElementById("K").value),
+            temperature: parseFloat(document.getElementById("temperature").value),
+            humidity:    parseFloat(document.getElementById("humidity").value),
+            ph:          parseFloat(document.getElementById("ph").value),
+            rainfall:    parseFloat(document.getElementById("rainfall").value),
+            language:    getApiLang()
+        };
+
+        const btn = event.currentTarget;
+        disableBtn(btn);
+        try {
+            setLoading("soilResult", t("common.loading"));
+            const data = await apiFetch(`${BASE_URL}/api/soil`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+            const crop = (data.recommended_crop || "").toUpperCase();
+            const advice = data.agent_advice || "";
+            if (!crop && !advice) {
+                showResult("soilResult", t("result.error") + (t("result.empty") || "Empty response from server."), true);
+            } else {
+                showResult("soilResult", `${t("soil.recommended")}${crop}\n\n${advice}`);
+            }
+        } catch(e) {
+            showResult("soilResult", t("result.error") + e.message, true);
+        } finally {
+            enableBtn(btn);
+        }
+    }
+
+    // 2. Chat
+    // Format a raw chatbot reply into clean HTML:
+    // - escape first (no XSS), then re-introduce known safe markup
+    // - **bold** → <strong>
+    // - lines starting with "- ", "• ", "* " → <ul><li>
+    // - lines starting with "1.", "2)" etc. → <ol><li>
+    // - paragraph breaks on blank lines
+    // - pull the closing "Follow local agricultural guidelines…" / "स्थानीय कृषि…" line into a styled disclaimer
+    function formatBotReply(raw) {
+        if (!raw) return "";
+        let txt = String(raw).trim();
+
+        // Pull out a trailing disclaimer line (English or Hindi variants)
+        let disclaimer = "";
+        const discRe = /(?:^|\n)\s*((?:Follow local agricultural guidelines[^\n]*)|(?:उपयोग से पहले[^\n]*स्थानीय[^\n]*)|(?:स्थानीय कृषि विभाग[^\n]*))\s*$/i;
+        const m = txt.match(discRe);
+        if (m) {
+            disclaimer = m[1].trim();
+            txt = txt.slice(0, m.index).trim();
+        }
+
+        const esc = escapeHtml(txt);
+        const lines = esc.split(/\r?\n/);
+
+        let html = "";
+        let listType = null;   // "ul" | "ol" | null
+        let paraBuf = [];
+
+        const flushPara = () => {
+            if (paraBuf.length) {
+                html += `<p>${paraBuf.join(" ")}</p>`;
+                paraBuf = [];
+            }
+        };
+        const closeList = () => {
+            if (listType) { html += `</${listType}>`; listType = null; }
+        };
+        const openList = (type) => {
+            if (listType !== type) {
+                closeList();
+                html += `<${type}>`;
+                listType = type;
+            }
+        };
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) { flushPara(); closeList(); continue; }
+
+            // Numbered list: "1.", "2)", "10."
+            const olM = line.match(/^(\d+)[.)]\s+(.*)$/);
+            // Bulleted list: "- ", "• ", "* "
+            const ulM = line.match(/^[-•*]\s+(.*)$/);
+
+            if (olM) {
+                flushPara();
+                openList("ol");
+                html += `<li>${olM[2]}</li>`;
+            } else if (ulM) {
+                flushPara();
+                openList("ul");
+                html += `<li>${ulM[1]}</li>`;
+            } else {
+                closeList();
+                paraBuf.push(line);
+            }
+        }
+        flushPara();
+        closeList();
+
+        // **bold** → <strong> (after lists, applied to whole output)
+        html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+        if (disclaimer) {
+            html += `<div class="km-disclaimer">⚠️ ${escapeHtml(disclaimer)}</div>`;
+        }
+        return html;
+    }
+
+    async function testChat(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const input = document.getElementById("chatInput");
+        const message = input.value.trim();
+        if (!message) return;
+
+        const chatDiv = document.getElementById("chatMessages");
+        chatDiv.innerHTML += `
+            <div class="flex justify-end items-end gap-2">
+                <span class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm max-w-[78%] leading-relaxed">${escapeHtml(message)}</span>
+                <span class="km-user-avatar" title="You">👤</span>
+            </div>`;
+        input.value = "";
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+
+        const sendBtn = document.querySelector('[onclick="testChat(event)"]');
+        disableBtn(sendBtn);
+        // Show typing indicator with bot avatar
+        const typingId = "typing_" + Date.now();
+        chatDiv.innerHTML += `
+            <div id="${typingId}" class="flex justify-start items-end gap-2">
+                <span class="km-avatar" title="KisanBot">🌾</span>
+                <span class="bg-white border border-green-200 text-gray-500 px-3 py-2 rounded-2xl text-sm animate-pulse">
+                    <span class="inline-block">●</span> <span class="inline-block">●</span> <span class="inline-block">●</span>
+                </span>
+            </div>`;
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+
+        try {
+            const data = await apiFetch(`${BASE_URL}/api/chat`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message, language: getApiLang()})
+            });
+            document.getElementById(typingId)?.remove();
+            const replyId = "chatReply_" + Date.now();
+            _resultStore[replyId] = data.reply || "";
+            chatDiv.innerHTML += `
+                <div class="flex justify-start items-start gap-2">
+                    <span class="km-avatar" title="KisanBot">🌾</span>
+                    <div class="km-bot-card">${formatBotReply(data.reply || "")}</div>
+                    <button type="button" onclick="playResult('${replyId}', event)"
+                        title="${t('result.listen')}"
+                        class="bg-white border border-green-600 text-green-700 px-2 py-1 rounded-full text-xs hover:bg-green-50 mt-1 shrink-0">🔊</button>
+                </div>`;
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+            autoSpeak(data.reply);
+        } catch(e) {
+            document.getElementById(typingId)?.remove();
+            chatDiv.innerHTML += `<div class="flex justify-start items-start gap-2">
+                <span class="km-avatar" title="KisanBot">🌾</span>
+                <div class="km-bot-card border-l-red-500" style="border-left-color:#ef4444; background:#fef2f2; color:#991b1b;">${t('result.error')}${escapeHtml(e.message)}</div>
+            </div>`;
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        } finally {
+            enableBtn(sendBtn);
+            input.focus();
+        }
+    }
+
+    async function resetChat(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+            await fetch(`${BASE_URL}/api/chat/reset`, {method: "POST"});
+        } catch(_) {}
+        document.getElementById("chatMessages").innerHTML = "";
+    }
+
+
+
+    // ─────────────────────────────────────────
+    // 3b. Quick Disease Scan — enhanced
+    // ─────────────────────────────────────────
+    let diseaseLang = "hi";   // independent language state for disease scan
+
+    function setDiseaseLang(lang) {
+        diseaseLang = lang;
+        const hiBtn = document.getElementById("diseaseLangHi");
+        const enBtn = document.getElementById("diseaseLangEn");
+        if (lang === "hi") {
+            hiBtn.classList.add("bg-green-600", "text-white");
+            hiBtn.classList.remove("bg-white", "text-gray-600");
+            enBtn.classList.remove("bg-green-600", "text-white");
+            enBtn.classList.add("bg-white", "text-gray-600");
+        } else {
+            enBtn.classList.add("bg-green-600", "text-white");
+            enBtn.classList.remove("bg-white", "text-gray-600");
+            hiBtn.classList.remove("bg-green-600", "text-white");
+            hiBtn.classList.add("bg-white", "text-gray-600");
+        }
+        // Update instruction text
+        const instrEl = document.getElementById("diseaseInstruction");
+        if (instrEl) {
+            instrEl.textContent = lang === "hi"
+                ? "कृपया पौधे की प्रभावित पत्ती की साफ फोटो अपलोड करें"
+                : "Upload a clear image of the affected plant leaf";
+        }
+    }
+
+    // Image preview for disease scan
+    document.getElementById("diseaseImage").addEventListener("change", function() {
+        const file = this.files[0];
+        const nameEl = document.getElementById("diseaseFileName");
+        if (file) {
+            if (nameEl) nameEl.textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById("diseasePreview");
+                const wrapper = document.getElementById("diseasePreviewWrapper");
+                preview.src = e.target.result;
+                wrapper?.classList.remove("hidden");
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    function showDiseaseCard(data) {
+        const resultEl = document.getElementById("diseaseResult");
+        resultEl.classList.remove("hidden");
+
+        const isEn = diseaseLang === "en";
+        const diseaseName = data.disease_name || data.diagnosis || "";
+        const cause      = data.cause || "";
+        const solution   = data.solution || "";
+        const prevention = data.prevention || "";
+
+        // If no structured fields, fall back to a plain text bubble
+        if (!cause && !solution && !prevention) {
+            resultEl.innerHTML = `
+                <div class="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-900 whitespace-pre-wrap">
+                    ${escapeHtml(diseaseName || t("disease.healthy"))}
+                </div>`;
+            autoSpeak(diseaseName);
+            return;
+        }
+
+        const labelDisease   = isEn ? "🌿 Disease Name"     : "🌿 रोग का नाम";
+        const labelCause     = isEn ? "⚠️ Cause"             : "⚠️ कारण";
+        const labelSol       = isEn ? "💊 Solution"          : "💊 समाधान";
+        const labelTreatment = isEn ? "💊 Treatment Type"    : "💊 उपचार का प्रकार";
+        const labelOrganic   = isEn ? "🌱 Organic Solution"  : "🌱 जैविक उपाय";
+        const labelChemical  = isEn ? "🧪 Chemical Solution" : "🧪 रासायनिक उपाय";
+        const labelPrev      = isEn ? "🛡️ Prevention"        : "🛡️ बचाव";
+
+        const treatmentType = data.treatment_type || "";
+        const organic       = data.organic || "";
+        const chemical      = data.chemical || "";
+        const shopQuery     = data.shop_query || "";
+
+        function row(label, value, colorClass) {
+            if (!value) return "";
+            return `
+                <div class="rounded-xl border ${colorClass} p-3">
+                    <p class="text-xs font-bold uppercase tracking-wide mb-1 opacity-70">${label}</p>
+                    <p class="text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(value)}</p>
+                </div>`;
+        }
+
+        const findShopsBtn = shopQuery ? `
+            <button type="button"
+                onclick="findFertilizerShops(${escapeHtml(JSON.stringify(shopQuery))}, this)"
+                class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-lg text-sm shadow-sm flex items-center gap-2">
+                ${escapeHtml(t("disease.findShops"))}
+            </button>` : "";
+
+        // Show solution row only as a fallback when we don't have organic/chemical fields
+        const solutionRow = (!organic && !chemical && solution)
+            ? row(labelSol, solution, "border-blue-300 bg-blue-50 text-blue-900")
+            : "";
+
+        resultEl.innerHTML = `
+            <div class="space-y-2">
+                ${row(labelDisease,   diseaseName,    "border-green-300 bg-green-50 text-green-900")}
+                ${row(labelCause,     cause,          "border-yellow-300 bg-yellow-50 text-yellow-900")}
+                ${row(labelTreatment, treatmentType,  "border-amber-300 bg-amber-50 text-amber-900")}
+                ${row(labelOrganic,   organic,        "border-emerald-300 bg-emerald-50 text-emerald-900")}
+                ${row(labelChemical,  chemical,       "border-blue-300 bg-blue-50 text-blue-900")}
+                ${solutionRow}
+                ${row(labelPrev,      prevention,     "border-purple-300 bg-purple-50 text-purple-900")}
+                <div class="flex flex-wrap justify-between gap-2 pt-1">
+                    ${findShopsBtn}
+                    ${listenButtonHTML(
+                        diseaseName + ". " + cause + ". " + (organic || solution) + ". " + chemical,
+                        "🔊 Sunें / Listen"
+                    )}
+                </div>
+            </div>`;
+
+        autoSpeak(diseaseName + ". " + cause);
+    }
+
+    // Build a Google Maps search URL and open it in a new tab.
+    // Tries browser geolocation first; falls back to asking for a city.
+    function findFertilizerShops(shopQuery, btn) {
+        const fallbackQuery = (diseaseLang === "en") ? "fertilizer shop" : "खाद की दुकान";
+        const query = (shopQuery && shopQuery.trim()) || fallbackQuery;
+
+        function openMapsAtCoords(lat, lng) {
+            const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}/@${lat},${lng},14z`;
+            window.open(url, "_blank", "noopener");
+        }
+
+        function openMapsForCity(city) {
+            if (!city) return;
+            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query + " near " + city)}`;
+            window.open(url, "_blank", "noopener");
+        }
+
+        function askCity() {
+            const city = prompt(t("disease.askCity"));
+            if (city && city.trim()) openMapsForCity(city.trim());
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            const original = btn.innerHTML;
+            btn.innerHTML = escapeHtml(t("disease.locating"));
+            setTimeout(() => { btn.disabled = false; btn.innerHTML = original; }, 6000);
+        }
+
+        if (!navigator.geolocation) { askCity(); return; }
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => openMapsAtCoords(pos.coords.latitude, pos.coords.longitude),
+            ()    => askCity(),
+            { timeout: 6000, maximumAge: 60000 }
+        );
+    }
+
+    async function detectDisease(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+
+        const imageFile = document.getElementById("diseaseImage").files[0];
+        if (!imageFile) {
+            const resultEl = document.getElementById("diseaseResult");
+            resultEl.classList.remove("hidden");
+            resultEl.innerHTML = `<div class="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">${escapeHtml(t("disease.noImage"))}</div>`;
+            return;
+        }
+
+        const cropVal = document.getElementById("diseaseCrop").value;
+
+        const formData = new FormData();
+        formData.append("image", imageFile);
+        formData.append("language", diseaseLang);
+        if (cropVal) formData.append("crop", cropVal);
+
+        const btn = event?.currentTarget;
+        disableBtn(btn);
+
+        // Show bouncing dots animation
+        document.getElementById("diseaseScanningAnim").classList.remove("hidden");
+        document.getElementById("diseaseScanningText").textContent = t("disease.scanning");
+        document.getElementById("diseaseResult").classList.add("hidden");
+
+        try {
+            const data = await apiFetch(`${BASE_URL}/api/disease`, {
+                method: "POST",
+                body: formData
+            });
+            showDiseaseCard(data);
+        } catch(e) {
+            const resultEl = document.getElementById("diseaseResult");
+            resultEl.classList.remove("hidden");
+            resultEl.innerHTML = `<div class="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">${escapeHtml(t("result.error") + e.message)}</div>`;
+        } finally {
+            enableBtn(btn);
+            document.getElementById("diseaseScanningAnim").classList.add("hidden");
+        }
+    }
+
+    // ─────────────────────────────────────────
+    // 4. Mandi Bhav
+    // ─────────────────────────────────────────
+    function renderMandiCard(data) {
+        const el = document.getElementById("mandiResult");
+        el.classList.remove("hidden");
+
+        const isEn   = (getApiLang && getApiLang() === "en");
+        const prices = data.live_prices || [];
+        const commodity = data.commodity || "";
+        const stateName = data.detected_state || data.state || document.getElementById("mandiState").value.trim();
+
+        // 1. Price-insight banner
+        let insightHtml = "";
+        const insight = data.price_insight;
+        if (insight) {
+            const colors = {
+                high:   "border-green-300 bg-green-50 text-green-900",
+                medium: "border-amber-300 bg-amber-50 text-amber-900",
+                low:    "border-red-300 bg-red-50 text-red-900",
+            };
+            const cls = colors[insight.level] || colors.medium;
+            const msg = isEn ? insight.message_en : insight.message_hi;
+            const bestLine = insight.best_market
+                ? `<p class="text-xs mt-1 opacity-80">${t("mandi.bestPrice")}: ₹${escapeHtml(String(insight.best_price))} — 🏪 ${escapeHtml(insight.best_market)}</p>`
+                : "";
+            insightHtml = `
+                <div class="rounded-xl border ${cls} p-3">
+                    <p class="text-xs font-bold uppercase tracking-wide mb-1 opacity-70">${t("mandi.insightTitle")}</p>
+                    <p class="text-sm font-semibold leading-relaxed">${escapeHtml(msg)}</p>
+                    ${bestLine}
+                </div>`;
+        }
+
+        // 1b. Price-trend chip (vs previous lookup)
+        let trendHtml = "";
+        const trend = data.price_trend;
+        if (trend) {
+            const trendStyle = {
+                up:   { cls: "border-green-300 bg-green-50 text-green-800", icon: "↑" },
+                down: { cls: "border-red-300 bg-red-50 text-red-800",       icon: "↓" },
+                flat: { cls: "border-gray-300 bg-gray-50 text-gray-700",    icon: "→" },
+                new:  { cls: "border-blue-300 bg-blue-50 text-blue-800",    icon: "•" },
+            };
+            const ts  = trendStyle[trend.direction] || trendStyle.new;
+            const msg = isEn ? trend.message_en : trend.message_hi;
+            const detail = (trend.previous_avg && trend.direction !== "new")
+                ? `<p class="text-[11px] mt-1 opacity-70">₹${escapeHtml(String(trend.previous_avg))} → ₹${escapeHtml(String(trend.current_avg))} (${trend.change_pct > 0 ? "+" : ""}${escapeHtml(String(trend.change_pct))}%) · ${t("mandi.trendVs")}${trend.previous_date ? " · " + escapeHtml(trend.previous_date) : ""}</p>`
+                : "";
+            trendHtml = `
+                <div class="rounded-xl border ${ts.cls} p-3">
+                    <p class="text-xs font-bold uppercase tracking-wide mb-1 opacity-70">${t("mandi.trendTitle")}</p>
+                    <p class="text-sm font-semibold leading-relaxed">${ts.icon} ${escapeHtml(msg)}</p>
+                    ${detail}
+                </div>`;
+        }
+
+        // 2. Live-price cards: 🌾 Crop | 🏪 Market | ₹ Price
+        let priceHtml = "";
+        if (prices.length > 0) {
+            const rows = prices.map(r => `
+                <div class="bg-white border border-green-200 rounded-xl p-3 shadow-sm flex flex-col gap-2">
+                    <div class="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                            <p class="font-semibold text-gray-500 uppercase tracking-wide">🌾 ${t("mandi.cropLabel")}</p>
+                            <p class="text-sm font-bold text-green-800 mt-0.5">${escapeHtml(commodity || r.commodity || "—")}</p>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-500 uppercase tracking-wide">📍 ${t("mandi.marketLabel")}</p>
+                            <p class="text-sm font-medium text-gray-800 mt-0.5">${escapeHtml(r.market || "N/A")}</p>
+                            <p class="text-[11px] text-gray-500">${escapeHtml(r.district || "")}${r.state ? " · " + escapeHtml(r.state) : ""}</p>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-500 uppercase tracking-wide">💰 ${t("mandi.priceLabel")}</p>
+                            <p class="text-base font-bold text-amber-700 mt-0.5">₹${escapeHtml(String(r.modal_price || "—"))}</p>
+                            <p class="text-[11px] text-gray-500">${t("mandi.perQuintal")}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 flex-wrap text-xs">
+                        <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Min ₹${escapeHtml(String(r.min_price || "—"))}</span>
+                        <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full">Max ₹${escapeHtml(String(r.max_price || "—"))}</span>
+                        ${r.arrival_date ? `<span class="text-gray-400">${escapeHtml(r.arrival_date)}</span>` : ""}
+                    </div>
+                </div>`).join("");
+            priceHtml = `
+                <div>
+                    <p class="text-sm font-bold text-green-800 mb-2">${t("mandi.liveTitle")} — ${escapeHtml(commodity)}</p>
+                    <div class="grid grid-cols-1 gap-2">${rows}</div>
+                </div>`;
+        } else {
+            priceHtml = `<p class="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg p-2">⚠️ ${t("mandi.noLive")}</p>`;
+        }
+
+        // 3. Selling advice + Find Nearby Mandi button
+        const advice = data.agent_advice || "";
+        const stateForMaps = stateName || "";
+        el.innerHTML = `
+            <div class="space-y-3">
+                ${insightHtml}
+                ${trendHtml}
+                ${priceHtml}
+                <div class="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <p class="text-sm font-bold text-green-800 mb-1">${t("mandi.adviceTitle")}</p>
+                    <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">${escapeHtml(advice)}</p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        ${listenButtonHTML(advice)}
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    // ─────────────────────────────────────────
+    // Unified nearest-mandi loader. Both "Get Mandi Prices" and
+    // "Find Nearest Mandis (GPS)" buttons funnel through this so the output
+    // format and quality is identical — only the input source changes:
+    //   • If GPS coords are available → distance-sort from the user.
+    //   • Else if a state is selected  → distance-sort from the state centroid.
+    // The backend always falls back to estimated prices when data.gov.in fails,
+    // so neither path can return empty/random results.
+    // ─────────────────────────────────────────
+    async function _loadNearestMandis({ lat = null, lon = null, state = null, btn = null } = {}) {
+        const commodity = document.getElementById("commodity").value.trim();
+        if (!commodity) {
+            showResult("mandiResult", t("result.error") + t("mandi.noCommodity"), true);
+            document.getElementById("commodity").focus();
+            return;
+        }
+        const payload = {
+            commodity,
+            language: getApiLang(),
+            limit: 5,
+        };
+        if (lat != null && lon != null) {
+            payload.lat = lat;
+            payload.lon = lon;
+        }
+        if (state) payload.state = state;
+
+        if (btn) disableBtn(btn);
+        setLoading("mandiResult", t("mandi.nearestFinding"));
+        try {
+            const data = await apiFetch(`${BASE_URL}/api/mandi/nearest`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (data && data.ok === false) {
+                showResult("mandiResult", t("result.error") + (data.error || ""), true);
+                return;
+            }
+            // Mirror detected state in the dropdown for context
+            const stateGuess = data.user_location && data.user_location.state_guess;
+            if (stateGuess) {
+                const sel = document.getElementById("mandiState");
+                const opt = Array.from(sel.options).find(o => o.value.toLowerCase() === String(stateGuess).toLowerCase());
+                if (opt) sel.value = opt.value;
+                const badge = document.getElementById("mandiDetectedLoc");
+                badge.innerText = t("mandi.detected") + stateGuess;
+                badge.classList.remove("hidden");
+            }
+            _renderNearestMandiCard(data);
+        } catch (e) {
+            showResult("mandiResult", t("result.error") + e.message, true);
+        } finally {
+            if (btn) enableBtn(btn);
+        }
+    }
+
+    // "Get Mandi Prices" — strict crop + state lookup, no GPS.
+    // (GPS is reserved for the explicit "Use my location" / "Find Nearest Mandis (GPS)" buttons.)
+    async function testMandi(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const btn = event.currentTarget;
+        const commodity = document.getElementById("commodity").value.trim();
+        const state = document.getElementById("mandiState").value.trim();
+        if (!commodity) {
+            showResult("mandiResult", t("result.error") + t("mandi.noCommodity"), true);
+            document.getElementById("commodity").focus();
+            return;
+        }
+        if (!state) {
+            showResult("mandiResult", t("result.error") + t("mandi.noState"), true);
+            document.getElementById("mandiState").focus();
+            return;
+        }
+        _loadNearestMandis({ state, btn });
+    }
+
+    // ─────────────────────────────────────────
+    // SOIL — Auto-fill from location (OpenWeather + SoilGrids)
+    // ─────────────────────────────────────────
+    function showSoilNote(text, type="info") {
+        const el = document.getElementById("soilAutofillNote");
+        el.classList.remove("hidden");
+        const colors = {
+            info:  "text-gray-600 bg-gray-50",
+            warn:  "text-yellow-700 bg-yellow-50",
+            ok:    "text-green-700 bg-green-50",
+            error: "text-red-700 bg-red-50"
+        };
+        el.className = `text-xs mb-2 p-2 rounded ${colors[type] || colors.info}`;
+        el.innerText = text;
+    }
+
+    // ─────────────────────────────────────────
+    // 1b. Region-Based Crop Suggestions (city or GPS → state advice)
+    // ─────────────────────────────────────────
+    function showRegionNote(text, type = "info") {
+        const el = document.getElementById("regionNote");
+        if (!el) return;
+        if (!text) { el.classList.add("hidden"); el.innerText = ""; return; }
+        el.classList.remove("hidden");
+        const colors = {
+            info:  "text-gray-600 bg-gray-50",
+            warn:  "text-yellow-700 bg-yellow-50",
+            ok:    "text-green-700 bg-green-50",
+            error: "text-red-700 bg-red-50"
+        };
+        el.className = `text-xs mt-2 mb-2 p-2 rounded ${colors[type] || colors.info}`;
+        el.innerText = text;
+    }
+
+    function renderRegionResult(data) {
+        const box = document.getElementById("regionResult");
+        try {
+            box.classList.remove("hidden");
+            data = data || {};
+
+            const safe = (v, fallback) => (v == null || v === "") ? (fallback || "—") : v;
+
+            const listOrDash = (arr) =>
+                (Array.isArray(arr) && arr.length)
+                    ? `<ul class="list-disc list-inside text-sm text-gray-800 space-y-0.5">
+                           ${arr.map(c => `<li>${escapeHtml(c)}</li>`).join("")}
+                       </ul>`
+                    : `<span class="text-gray-400 text-sm">${t("region.none")}</span>`;
+
+            const card = (title, body, accent) => `
+                <div class="rounded-lg border ${accent} p-3 bg-white">
+                    <div class="text-xs font-semibold text-gray-600 mb-1">${escapeHtml(title)}</div>
+                    <div>${body}</div>
+                </div>`;
+
+            box.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    ${card(t("region.cardLocation"),
+                           `<div class="text-base font-semibold text-green-800">${escapeHtml(safe(data.location))}</div>`,
+                           "border-green-200")}
+                    ${card(t("region.cardSoil"),
+                           `<div class="text-base font-semibold text-amber-800">${escapeHtml(safe(data.soil))}</div>`,
+                           "border-amber-200")}
+                    ${card(t("region.cardKharif"), listOrDash(data.kharif), "border-green-200")}
+                    ${card(t("region.cardRabi"),   listOrDash(data.rabi),   "border-emerald-200")}
+                    ${card(t("region.cardZaid"),   listOrDash(data.zaid),   "border-yellow-200")}
+                    ${card(t("region.cardAdvice"),
+                           `<div class="text-sm text-gray-800 leading-relaxed">${escapeHtml(safe(data.advice, t("result.empty")))}</div>`,
+                           "border-blue-200")}
+                </div>
+            `;
+        } catch(e) {
+            try {
+                console.warn("[renderRegionResult] failed:", e);
+                box.className = "mt-3 text-sm text-red-700 bg-red-50 rounded p-3";
+                box.classList.remove("hidden");
+                box.innerText = t("result.error") + (e && e.message ? e.message : "render failed");
+            } catch(_) {}
+        }
+    }
+
+    async function _fetchRegion(payload, btn) {
+        if (btn) disableBtn(btn);
+        showRegionNote(t("region.fetching"), "info");
+        document.getElementById("regionResult").classList.add("hidden");
+        try {
+            const res = await fetch(`${BASE_URL}/api/region-soil`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({...payload, language: getApiLang()})
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                showRegionNote(data.error || `Server error ${res.status}`, "error");
+                return;
+            }
+            showRegionNote(data.notice || "", data.notice ? "warn" : "info");
+            if (!data.notice) showRegionNote("");
+            renderRegionResult(data);
+        } catch (e) {
+            showRegionNote(t("result.error") + e.message, "error");
+        } finally {
+            if (btn) enableBtn(btn);
+        }
+    }
+
+    async function getRegionAdvice(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const city = document.getElementById("regionCity").value.trim();
+        if (!city) {
+            showRegionNote(t("region.cityPlaceholder"), "warn");
+            document.getElementById("regionCity").focus();
+            return;
+        }
+        const btn = (event && event.currentTarget && event.currentTarget.tagName === "BUTTON") ? event.currentTarget : null;
+        await _fetchRegion({city}, btn);
+    }
+
+    function getRegionAdviceByGPS(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const btn = (event && event.currentTarget) ? event.currentTarget : null;
+        if (!navigator.geolocation) {
+            showRegionNote(t("region.gpsManualFallback"), "info");
+            return;
+        }
+        showRegionNote(t("region.locating"), "info");
+        if (btn) disableBtn(btn);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                if (btn) enableBtn(btn);
+                await _fetchRegion({lat: pos.coords.latitude, lon: pos.coords.longitude}, btn);
+            },
+            (err) => {
+                if (btn) enableBtn(btn);
+                // Permission denied / unavailable / timeout — always degrade
+                // gracefully: show a friendly note in the user's language
+                // instead of a generic browser error.
+                showRegionNote(t("region.gpsManualFallback"), "info");
+            },
+            { timeout: 10000, maximumAge: 60000 }
+        );
+    }
+
+    function autofillSoilFromLocation(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        if (!navigator.geolocation) {
+            showSoilNote(t("soil.geoUnsupported"), "error");
+            return;
+        }
+        showSoilNote(t("soil.detectingLocation"), "info");
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                showSoilNote(t("soil.fetching"), "info");
+                try {
+                    const res = await fetch(
+                        `${BASE_URL}/api/soil-info?lat=${latitude}&lon=${longitude}`
+                    );
+                    const data = await res.json();
+                    if (data.error) {
+                        showSoilNote(t("result.error") + data.error, "error");
+                        return;
+                    }
+                    // Fill fields if we got values
+                    const setVal = (id, v) => {
+                        if (v !== undefined && v !== null) {
+                            document.getElementById(id).value = v;
+                        }
+                    };
+                    setVal("N", data.N);
+                    setVal("P", data.P);
+                    setVal("K", data.K);
+                    setVal("temperature", data.temperature);
+                    setVal("humidity", data.humidity);
+                    setVal("ph", data.ph);
+                    setVal("rainfall", data.rainfall);
+
+                    const realFields = [];
+                    if (data.source && data.source.weather) realFields.push("temperature, humidity");
+                    if (data.source && data.source.ph) realFields.push("pH");
+                    const realPart = realFields.length
+                        ? `${t("soil.realData")}${realFields.join(", ")}. `
+                        : "";
+                    showSoilNote(realPart + (realFields.length ? t("soil.note") : (data.notes || "")), "ok");
+                } catch (e) {
+                    showSoilNote(t("result.error") + e.message, "error");
+                }
+            },
+            (err) => showSoilNote(t("soil.locationDenied") + err.message, "error")
+        );
+    }
+
+    // ─────────────────────────────────────────
+    // 6. WEATHER WIDGET
+    // ─────────────────────────────────────────
+    function renderWeather(data) {
+        const el = document.getElementById("weatherResult");
+        try {
+            el.classList.remove("hidden");
+            data = data || {};
+            if (data.error) {
+                el.className = "mt-3 text-sm text-red-700 bg-red-50 rounded p-3";
+                el.innerText = t("weather.errorPrefix") + data.error;
+                return;
+            }
+            const iconUrl = data.icon ? `https://openweathermap.org/img/wn/${escapeHtml(data.icon)}@2x.png` : "";
+            const rain = data.rain_prediction || {};
+            const willRain = !!rain.will_rain_next_24h;
+            const rainSummary = willRain
+                ? t("weather.summaryRain") + (rain.chance_percent != null ? rain.chance_percent + "%" : "")
+                : t("weather.summaryNoRain");
+            const safeNum = (v, suffix) => (v == null || isNaN(Number(v))) ? "—" : (Math.round(Number(v)) + (suffix || ""));
+            const safeStr = (v) => (v == null || v === "") ? "—" : escapeHtml(String(v));
+            el.className = "mt-3 text-sm text-gray-800 bg-green-50 rounded p-3";
+            el.innerHTML = `
+                <div class="flex items-center gap-3 flex-wrap">
+                    ${iconUrl ? `<img src="${iconUrl}" alt="" class="w-12 h-12" onerror="this.style.display='none'"/>` : ""}
+                    <div>
+                        <div class="font-semibold text-green-800">
+                            📍 ${safeStr(data.location)}${data.country ? ", " + escapeHtml(String(data.country)) : ""}
+                        </div>
+                        <div>🌡️ <b>${safeNum(data.temperature_c, "°C")}</b>
+                            <span class="text-gray-500">(${t("weather.feelsLike")} ${safeNum(data.feels_like_c, "°C")})</span>
+                            — ${safeStr(data.description || data.condition)}</div>
+                        <div class="text-gray-600">💧 ${t("weather.humidity")}: ${safeNum(data.humidity_percent, "%")} &nbsp; 💨 ${t("weather.wind")}: ${safeNum(data.wind_kph, " km/h")}</div>
+                        <div class="mt-1 ${willRain ? 'text-blue-700' : 'text-gray-600'}">
+                            ${willRain ? '☔' : '🌤️'} ${rainSummary}
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch(e) {
+            try {
+                console.warn("[renderWeather] failed:", e);
+                el.className = "mt-3 text-sm text-red-700 bg-red-50 rounded p-3";
+                el.classList.remove("hidden");
+                el.innerText = t("weather.errorPrefix") + (e && e.message ? e.message : "render failed");
+            } catch(_) {}
+        }
+    }
+
+    function setWeatherLoading(msg) {
+        const el = document.getElementById("weatherResult");
+        el.classList.remove("hidden");
+        el.className = "mt-3 text-sm text-yellow-700 bg-yellow-50 rounded p-3";
+        el.innerText = "⏳ " + msg;
+    }
+
+    async function fetchWeather(qs) {
+        try {
+            const res = await fetch(`${BASE_URL}/api/weather?${qs}`);
+            const data = await res.json();
+            renderWeather(data);
+        } catch(e) {
+            renderWeather({error: e.message});
+        }
+    }
+
+    function getWeatherByCity(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const city = document.getElementById("weatherCity").value.trim();
+        if (!city) return;
+        setWeatherLoading(t("common.loading"));
+        fetchWeather("city=" + encodeURIComponent(city));
+    }
+
+    function getWeatherByLocation(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        if (!navigator.geolocation) {
+            renderWeather({error: t("soil.geoUnsupported")});
+            return;
+        }
+        setWeatherLoading(t("soil.detectingLocation"));
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const { latitude, longitude } = pos.coords;
+                setWeatherLoading(t("common.loading"));
+                fetchWeather(`lat=${latitude}&lon=${longitude}`);
+            },
+            (err) => renderWeather({error: t("soil.locationDenied") + err.message})
+        );
+    }
+
+    // ─────────────────────────────────────────
+    // VOICE INPUT (SpeechRecognition) + OUTPUT (speechSynthesis)
+    // ─────────────────────────────────────────
+    let recognition = null;
+    let isListening = false;
+    // Active target — which input/button/status the current voice session is bound to
+    let _micTarget = { inputId: "chatInput", btnId: "micBtn", statusId: "micStatus" };
+
+    function setVoiceLang(lang) {
+        const prev = voiceLang;
+        voiceLang = lang;
+        if (recognition) recognition.lang = lang;
+        // Stop any in-progress speech so the next reply uses the new language
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        _clearVoiceAutoStop && _clearVoiceAutoStop();
+        _hideStopVoiceFab && _hideStopVoiceFab();
+        // Re-render the entire UI in the newly chosen language
+        applyI18n();
+        // Reset the chat conversation so the bot replies in the new language
+        // (otherwise the prior history keeps it answering in the old language).
+        const prevLang = (prev || "").startsWith("en") ? "en" : "hi";
+        const newLang  = (lang || "").startsWith("en") ? "en" : "hi";
+        if (prevLang !== newLang) {
+            try { fetch(`${BASE_URL}/api/chat/reset`, {method: "POST"}); } catch(_) {}
+            const chatDiv = document.getElementById("chatMessages");
+            if (chatDiv) chatDiv.innerHTML = "";
+        }
+    }
+
+    function showMicStatus(text, show=true, statusId) {
+        const id = statusId || _micTarget.statusId;
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerText = text;
+        el.classList.toggle("hidden", !show);
+    }
+
+    // True when the user explicitly stopped (so we don't auto-restart)
+    let _userStoppedMic = false;
+    // Captures the input value at the moment listening started, so accumulated
+    // finalized segments are appended cleanly without duplication.
+    let _micBaseValue = "";
+
+    function initRecognition() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return null;
+        const r = new SR();
+        r.lang = voiceLang;
+        // Show partial results so users see live feedback, but we only commit
+        // finalized segments into the input field.
+        r.interimResults = true;
+        // Ask the engine for several hypotheses; we'll pick the most confident
+        // one per finalized segment to improve word accuracy (especially for
+        // Indian-language speech and accented English).
+        r.maxAlternatives = 5;
+        // Keep listening through brief pauses so trailing words aren't dropped.
+        r.continuous = true;
+
+        r.onstart = () => {
+            isListening = true;
+            const input = document.getElementById(_micTarget.inputId);
+            _micBaseValue = input ? (input.value ? input.value + " " : "") : "";
+            const btn = document.getElementById(_micTarget.btnId);
+            if (btn) {
+                btn.classList.remove("bg-white", "text-green-700");
+                btn.classList.add("bg-red-500", "text-white", "animate-pulse");
+            }
+            showMicStatus(t("chat.listening"));
+        };
+        r.onerror = (e) => {
+            // "no-speech" and "aborted" are common when user pauses; ignore so
+            // continuous mode can resume cleanly.
+            if (e.error === "no-speech" || e.error === "aborted") return;
+            showMicStatus("Mic error: " + e.error);
+        };
+        r.onend = () => {
+            // Auto-restart if the browser ended the session but the user didn't
+            // stop the mic (some browsers cap each session at ~60s).
+            if (!_userStoppedMic) {
+                try { r.start(); return; } catch (e) { /* fall through */ }
+            }
+            isListening = false;
+            _userStoppedMic = false;
+            const btn = document.getElementById(_micTarget.btnId);
+            if (btn) {
+                btn.classList.add("bg-white", "text-green-700");
+                btn.classList.remove("bg-red-500", "text-white", "animate-pulse");
+            }
+            const sid = _micTarget.statusId;
+            setTimeout(() => showMicStatus("", false, sid), 1500);
+        };
+        r.onresult = (event) => {
+            const input = document.getElementById(_micTarget.inputId);
+            if (!input) return;
+            // For each result, pick the alternative with the highest
+            // confidence score (falls back to the first if confidence is
+            // unavailable). This noticeably improves word accuracy.
+            const pickBest = (res) => {
+                let best = res[0];
+                for (let j = 1; j < res.length; j++) {
+                    if ((res[j].confidence || 0) > (best.confidence || 0)) {
+                        best = res[j];
+                    }
+                }
+                return best.transcript;
+            };
+            let finalText = "";
+            let interimText = "";
+            for (let i = 0; i < event.results.length; i++) {
+                const res = event.results[i];
+                const transcript = pickBest(res);
+                if (res.isFinal) finalText += transcript;
+                else interimText += transcript;
+            }
+            input.value = (_micBaseValue + finalText + interimText).trimStart();
+            if (interimText) {
+                showMicStatus(t("chat.listening") + " …" + interimText.trim());
+            }
+        };
+        return r;
+    }
+
+    function _toggleMicForTarget(event, target) {
+        event.preventDefault();
+        event.stopPropagation();
+        // If a session is already running on a different target, stop it first
+        if (isListening && recognition && _micTarget.btnId !== target.btnId) {
+            _userStoppedMic = true;
+            try { recognition.stop(); } catch(e) {}
+        }
+        _micTarget = target;
+        if (!recognition) recognition = initRecognition();
+        if (!recognition) {
+            showMicStatus(t("chat.micUnsupported"));
+            return;
+        }
+        recognition.lang = voiceLang;
+        if (isListening) {
+            // User clicked the mic to end the session — don't auto-restart.
+            _userStoppedMic = true;
+            try { recognition.stop(); } catch(e) {}
+        } else {
+            _userStoppedMic = false;
+            try { recognition.start(); } catch(e) { showMicStatus("Mic start error: " + e.message); }
+        }
+    }
+
+    function toggleMic(event) {
+        _toggleMicForTarget(event, { inputId: "chatInput", btnId: "micBtn", statusId: "micStatus" });
+    }
+
+    function refreshYojanaVoiceBtn() {
+        const btn = document.getElementById("yojanaVoiceBtn");
+        const icon = document.getElementById("yojanaVoiceIcon");
+        const label = document.getElementById("yojanaVoiceLabel");
+        if (!btn || !icon || !label) return;
+        if (yojanaVoiceOn) {
+            icon.innerText = "🔊";
+            label.innerText = t("yojana.voiceOn");
+            btn.classList.remove("bg-gray-400", "hover:bg-gray-500");
+            btn.classList.add("bg-green-600", "hover:bg-green-700");
+        } else {
+            icon.innerText = "🔈";
+            label.innerText = t("yojana.voiceOff");
+            btn.classList.remove("bg-green-600", "hover:bg-green-700");
+            btn.classList.add("bg-gray-400", "hover:bg-gray-500");
+        }
+    }
+
+    function toggleYojanaVoice(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        yojanaVoiceOn = !yojanaVoiceOn;
+        if (!yojanaVoiceOn) {
+            try { window.speechSynthesis.cancel(); } catch(e) {}
+        }
+        refreshYojanaVoiceBtn();
+    }
+
+    // Speak whenever schemes are rendered, controlled by the yojana-tab toggle
+    // (independent from the global header speaker, so the user can keep schemes
+    //  reading aloud even if the rest of the app stays silent).
+    function speakYojanaReply(text) {
+        if (!yojanaVoiceOn || !text) return;
+        speakReply(text);
+    }
+
+    function toggleYojanaMic(event) {
+        // Auto-open the custom-query box if it's still collapsed, so the user sees what's being typed
+        const wrap = document.getElementById("yojanaCustomWrap");
+        if (wrap && wrap.classList.contains("hidden")) {
+            wrap.classList.remove("hidden");
+            _yojanaCustomOpen = true;
+        }
+        _toggleMicForTarget(event, { inputId: "yojanaQuery", btnId: "yojanaMicBtn", statusId: "yojanaMicStatus" });
+    }
+
+    function toggleSpeaker(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        speakerOn = !speakerOn;
+
+        // Chat-tab speaker button
+        const chatBtn = document.getElementById("speakerBtn");
+        if (chatBtn) {
+            chatBtn.innerText = speakerOn ? "🔊" : "🔈";
+            chatBtn.classList.toggle("bg-green-100", speakerOn);
+        }
+
+        // Global header speaker button
+        const globalBtn = document.getElementById("globalSpeakerBtn");
+        if (globalBtn) {
+            const label = speakerOn ? t("hdr.autoReadOn") : t("hdr.autoRead");
+            globalBtn.innerHTML = (speakerOn ? "🔊 " : "🔈 ") + label;
+            globalBtn.classList.toggle("bg-green-600", speakerOn);
+            globalBtn.classList.toggle("bg-green-900", !speakerOn);
+        }
+
+        if (!speakerOn) {
+            try { window.speechSynthesis.cancel(); } catch(e) {}
+        }
+    }
+
+    // Maximum time (ms) any single utterance is allowed to keep speaking
+    // before we auto-stop it. Prevents runaway long replies from talking
+    // forever if the user walks away.
+    const VOICE_AUTO_STOP_MS = 90 * 1000;
+    let _voiceAutoStopTimer = null;
+    // User-controllable speech rate (0.8 slow, 0.95 normal, 1.2 fast).
+    let _voiceRate = 0.95;
+
+    function setVoiceSpeed(val) {
+        const r = parseFloat(val);
+        if (!isNaN(r) && r > 0) _voiceRate = r;
+        // Stop any in-progress speech so the next utterance uses the new rate
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        _clearVoiceAutoStop();
+        _hideStopVoiceFab();
+    }
+
+    function _showStopVoiceFab() {
+        const fab = document.getElementById("stopVoiceFab");
+        if (fab) fab.classList.remove("hidden");
+    }
+    function _hideStopVoiceFab() {
+        const fab = document.getElementById("stopVoiceFab");
+        if (fab) fab.classList.add("hidden");
+    }
+    function _clearVoiceAutoStop() {
+        if (_voiceAutoStopTimer) {
+            clearTimeout(_voiceAutoStopTimer);
+            _voiceAutoStopTimer = null;
+        }
+    }
+
+    // Globally accessible — stops any reply that's currently being spoken,
+    // regardless of which page/tab the user is on. Wired to the floating
+    // "Stop Voice" button.
+    function stopVoiceNow(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        _clearVoiceAutoStop();
+        _hideStopVoiceFab();
+    }
+
+    function speakReply(text) {
+        if (!text) return;
+        if (!("speechSynthesis" in window)) return;
+        try {
+            window.speechSynthesis.cancel();
+            _clearVoiceAutoStop();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = voiceLang;
+            u.rate = _voiceRate;
+            u.pitch = 1;
+            // Prefer a voice matching the selected language if available
+            const voices = window.speechSynthesis.getVoices();
+            const match = voices.find(v => v.lang === voiceLang)
+                       || voices.find(v => v.lang && v.lang.startsWith(voiceLang.split("-")[0]));
+            if (match) u.voice = match;
+            // Show the floating Stop button while speaking; hide it when done
+            u.onstart = () => {
+                _showStopVoiceFab();
+                _clearVoiceAutoStop();
+                _voiceAutoStopTimer = setTimeout(() => stopVoiceNow(), VOICE_AUTO_STOP_MS);
+            };
+            u.onend = () => { _clearVoiceAutoStop(); _hideStopVoiceFab(); };
+            u.onerror = () => { _clearVoiceAutoStop(); _hideStopVoiceFab(); };
+            window.speechSynthesis.speak(u);
+        } catch(e) {
+            _clearVoiceAutoStop();
+            _hideStopVoiceFab();
+        }
+    }
+
+    // Auto-play helper: only speaks if the user enabled the global speaker toggle.
+    // Manual Listen-button clicks always speak, regardless of the toggle.
+    function autoSpeak(text) {
+        if (speakerOn) speakReply(text);
+    }
+
+    // ─────────────────────────────────────────
+    // Centralized Listen button — robust against any text content
+    // (apostrophes, quotes, line breaks, HTML chars). All "🔊 Listen"
+    // buttons use this helper instead of inline onclick=speakReply(...)
+    // which used to break silently when the text contained quotes.
+    // ─────────────────────────────────────────
+    function listenButtonHTML(text, label) {
+        const safe = escapeHtml(String(text == null ? "" : text));
+        const lbl  = escapeHtml(label || (t("result.listen") || "🔊 Listen"));
+        return `<button type="button" class="listen-btn text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50"
+                    data-speak-text="${safe}">${lbl}</button>`;
+    }
+
+    // One delegated handler for every .listen-btn, anywhere on the page.
+    document.addEventListener("click", (ev) => {
+        const btn = ev.target.closest(".listen-btn");
+        if (!btn) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        speakReply(btn.dataset.speakText || "");
+    });
+
+    // Some browsers populate voices asynchronously — trigger a load
+    if ("speechSynthesis" in window) {
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
+    // ─────────────────────────────────────────
+    // 4c. Mandi — Nearest Mandis by GPS (with Chart.js, distance, recommendation, TTS)
+    // ─────────────────────────────────────────
+    let _mandiChart = null;
+
+    function escapeAttr(s) {
+        return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function _renderMandiChart(chart, isEn) {
+        if (!window.Chart || !chart || !chart.labels || chart.labels.length === 0) return;
+        const ctx = document.getElementById("mandiPriceChart");
+        if (!ctx) return;
+        if (_mandiChart) { try { _mandiChart.destroy(); } catch(e) {} _mandiChart = null; }
+        _mandiChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: chart.labels,
+                datasets: [
+                    {
+                        label: isEn ? "Min" : "न्यूनतम",
+                        data: chart.min_prices,
+                        backgroundColor: "rgba(34,197,94,0.55)",
+                        borderColor: "rgba(22,163,74,1)",
+                        borderWidth: 1,
+                    },
+                    {
+                        label: isEn ? "Modal" : "मोडल",
+                        data: chart.modal_prices,
+                        backgroundColor: "rgba(245,158,11,0.85)",
+                        borderColor: "rgba(217,119,6,1)",
+                        borderWidth: 1,
+                    },
+                    {
+                        label: isEn ? "Max" : "अधिकतम",
+                        data: chart.max_prices,
+                        backgroundColor: "rgba(239,68,68,0.55)",
+                        borderColor: "rgba(220,38,38,1)",
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: ₹${ctx.parsed.y}/${isEn ? "quintal" : "क्विंटल"}`,
+                        },
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: { display: true, text: isEn ? "₹ per quintal" : "₹ प्रति क्विंटल", font: { size: 11 } },
+                        ticks: { font: { size: 10 } },
+                    },
+                    x: { ticks: { font: { size: 10 }, maxRotation: 30, minRotation: 0 } },
+                },
+            },
+        });
+    }
+
+    function _renderNearestMandiCard(data) {
+        const el = document.getElementById("mandiResult");
+        el.classList.remove("hidden");
+        const isEn = (getApiLang() === "en");
+        const list = data.nearest_mandis || [];
+        const advice = isEn ? data.advice_en : data.advice_hi;
+        const dataSourceMsg = (data.fallback_used && data.data_source && data.data_source.indexOf("estimated") !== -1)
+            ? (data.data_source.indexOf("mixed") !== -1 ? t("mandi.mixedNote") : t("mandi.estimatedNote"))
+            : "";
+
+        if (list.length === 0) {
+            el.innerHTML = `<p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">${escapeHtml(advice || "No data")}</p>`;
+            return;
+        }
+
+        const bestName = data.best_mandi || "";
+        const cards = list.map((m) => {
+            const isBest = (m.market === bestName);
+            return `
+                <div class="rounded-xl border ${isBest ? "border-amber-400 bg-amber-50" : "border-green-200 bg-white"} p-3 shadow-sm">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold ${isBest ? "text-amber-800" : "text-green-800"} truncate">
+                                ${isBest ? "⭐ " : "📍 "}${escapeHtml(m.market)}
+                            </p>
+                            <p class="text-[11px] text-gray-500 truncate">${escapeHtml(m.district || "")}${m.state ? " · " + escapeHtml(m.state) : ""}</p>
+                            <p class="text-[11px] text-gray-600 mt-1">📏 ${t("mandi.distanceLabel")}: <span class="font-semibold">${escapeHtml(String(m.distance_km))} km</span></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-amber-700 leading-none">₹${escapeHtml(String(m.modal_price))}</p>
+                            <p class="text-[10px] text-gray-500 mt-0.5">${t("mandi.perQuintal")}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 flex-wrap text-[11px] mt-2">
+                        <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">${t("mandi.chartMin")}: ₹${escapeHtml(String(m.min_price ?? "—"))}</span>
+                        <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full">${t("mandi.chartMax")}: ₹${escapeHtml(String(m.max_price ?? "—"))}</span>
+                        <span class="text-gray-400">${escapeHtml(m.source === "estimated" ? (isEn ? "estimated" : "अनुमानित") : "live")}</span>
+                    </div>
+                </div>`;
+        }).join("");
+
+        el.innerHTML = `
+            <div class="space-y-3">
+                <div class="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                    <p class="text-xs font-bold uppercase tracking-wide text-amber-800 opacity-80">${t("mandi.bestRecommend")}</p>
+                    <p class="text-base font-extrabold text-amber-900 mt-0.5">⭐ ${escapeHtml(bestName)} — ₹${escapeHtml(String(data.average_price ? (list.find(m => m.market === bestName)?.modal_price ?? data.average_price) : data.average_price))}/${t("mandi.perQuintal")}</p>
+                    <p class="text-[12px] text-amber-900/80 mt-0.5">${t("mandi.avgPrice")}: ₹${escapeHtml(String(data.average_price))} · ${t("mandi.dataSource")}: ${escapeHtml(data.data_source || "data.gov.in")}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm font-bold text-green-800 mb-2">${t("mandi.nearestTitle")} — ${escapeHtml(data.commodity || "")}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${cards}</div>
+                </div>
+
+                <div class="bg-white border border-green-200 rounded-xl p-3">
+                    <p class="text-sm font-bold text-green-800 mb-1">${t("mandi.chartTitle")}</p>
+                    <div style="position:relative; height: 260px;">
+                        <canvas id="mandiPriceChart"></canvas>
+                    </div>
+                </div>
+
+                ${dataSourceMsg ? `<p class="text-[11px] text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-lg p-2">⚠️ ${escapeHtml(dataSourceMsg)}</p>` : ""}
+
+                <div class="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <p class="text-sm font-bold text-green-800 mb-1">${t("mandi.adviceTitle")}</p>
+                    <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">${escapeHtml(advice || "")}</p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        ${listenButtonHTML(advice || "")}
+                    </div>
+                </div>
+            </div>`;
+
+        // Render chart after DOM update
+        setTimeout(() => _renderMandiChart(data.chart, isEn), 30);
+        // Auto TTS in selected language (only if user enabled the speaker)
+        autoSpeak(advice);
+    }
+
+    async function findNearestMandis(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const commodity = document.getElementById("commodity").value.trim();
+        if (!commodity) {
+            showResult("mandiResult", t("result.error") + t("mandi.noCommodity"), true);
+            document.getElementById("commodity").focus();
+            return;
+        }
+        if (!navigator.geolocation) {
+            showResult("mandiResult", t("result.error") + t("mandi.noGps"), true);
+            return;
+        }
+        const btn = event && event.currentTarget;
+        if (btn) disableBtn(btn);
+        setLoading("mandiResult", t("mandi.nearestFinding"));
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                try {
+                    const data = await apiFetch(`${BASE_URL}/api/mandi/nearest`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            commodity,
+                            lat: latitude,
+                            lon: longitude,
+                            language: getApiLang(),
+                            limit: 5,
+                        }),
+                    });
+                    if (data && data.ok === false) {
+                        showResult("mandiResult", t("result.error") + (data.error || ""), true);
+                    } else {
+                        // Mirror detected state in the dropdown for context
+                        const stateGuess = data.user_location && data.user_location.state_guess;
+                        if (stateGuess) {
+                            const sel = document.getElementById("mandiState");
+                            const opt = Array.from(sel.options).find(o => o.value.toLowerCase() === String(stateGuess).toLowerCase());
+                            if (opt) sel.value = opt.value;
+                            const badge = document.getElementById("mandiDetectedLoc");
+                            badge.innerText = t("mandi.detected") + stateGuess;
+                            badge.classList.remove("hidden");
+                        }
+                        _renderNearestMandiCard(data);
+                    }
+                } catch (e) {
+                    showResult("mandiResult", t("result.error") + e.message, true);
+                } finally {
+                    if (btn) enableBtn(btn);
+                }
+            },
+            (err) => {
+                if (btn) enableBtn(btn);
+                showResult("mandiResult", t("result.error") + t("mandi.gpsDenied"), true);
+            },
+            { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }
+        );
+    }
+
+    // 4b. "Use my location" — same path as the GPS button so output stays consistent.
+    function getMandiByLocation(event) {
+        return findNearestMandis(event);
+    }
+
+    // ─────────────────────────────────────────
+    // 5. Sarkari Yojana
+    // ─────────────────────────────────────────
+    let _yojanaCustomOpen = false;
+
+    function toggleYojanaCustom() {
+        _yojanaCustomOpen = !_yojanaCustomOpen;
+        const wrap = document.getElementById("yojanaCustomWrap");
+        wrap.classList.toggle("hidden", !_yojanaCustomOpen);
+        if (_yojanaCustomOpen) document.getElementById("yojanaQuery").focus();
+    }
+
+    function onYojanaSchemeChange() {
+        const val = document.getElementById("yojanaScheme").value;
+        // If user picks from dropdown, collapse the custom box
+        if (val) {
+            document.getElementById("yojanaCustomWrap").classList.add("hidden");
+            _yojanaCustomOpen = false;
+        }
+    }
+
+    function renderYojanaCard(data) {
+        const el = document.getElementById("yojanaResult");
+        el.classList.remove("hidden");
+
+        // ─── New structured path: render clickable cards from data.schemes ───
+        if (Array.isArray(data.schemes) && data.schemes.length > 0) {
+            const applyLabel = t("yojana.apply");
+            const eligLabel  = t("yojana.eligibility");
+            const benLabel   = t("yojana.benefits");
+            const stepsLabel = t("yojana.steps");
+
+            const ul = (items, color) => (items || []).map(it =>
+                `<li class="flex gap-2"><span class="${color}">•</span><span>${escapeHtml(it)}</span></li>`).join("");
+            const ol = (items) => (items || []).map((it, i) =>
+                `<li class="flex gap-2"><span class="font-bold text-green-700 min-w-[1.4em]">${i+1}.</span><span>${escapeHtml(it)}</span></li>`).join("");
+
+            const cards = data.schemes.map(s => {
+                const link = s.link ? `
+                    <a href="${escapeHtml(s.link)}" target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-1 mt-3 bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800">
+                       🔗 ${escapeHtml(applyLabel)} →
+                    </a>` : "";
+                return `
+                <div class="border border-green-200 rounded-xl overflow-hidden mb-3 bg-white">
+                    <div class="bg-green-700 text-white px-4 py-2 font-semibold text-sm">📌 ${escapeHtml(s.name || "")}</div>
+                    <div class="p-3 space-y-3">
+                        ${s.description ? `<p class="text-sm text-gray-700">${escapeHtml(s.description)}</p>` : ""}
+                        ${(s.eligibility && s.eligibility.length) ? `
+                        <div>
+                            <p class="text-xs font-bold text-green-800 uppercase tracking-wide mb-1">✅ ${escapeHtml(eligLabel)}</p>
+                            <ul class="text-sm text-gray-700 space-y-1 leading-relaxed">${ul(s.eligibility, "text-green-600")}</ul>
+                        </div>` : ""}
+                        ${(s.benefits && s.benefits.length) ? `
+                        <div>
+                            <p class="text-xs font-bold text-yellow-700 uppercase tracking-wide mb-1">🎁 ${escapeHtml(benLabel)}</p>
+                            <ul class="text-sm text-gray-700 space-y-1 leading-relaxed">${ul(s.benefits, "text-yellow-500")}</ul>
+                        </div>` : ""}
+                        ${(s.steps && s.steps.length) ? `
+                        <div>
+                            <p class="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">📝 ${escapeHtml(stepsLabel)}</p>
+                            <ol class="text-sm text-gray-700 space-y-1 leading-relaxed list-none">${ol(s.steps)}</ol>
+                        </div>` : ""}
+                        ${link}
+                    </div>
+                </div>`;
+            }).join("");
+
+            // Store plain text for the Listen button
+            const plain = data.agent_advice || data.schemes.map(s => s.name + ". " + (s.description || "")).join(" ");
+            _resultStore["yojanaResult"] = plain;
+            el.innerHTML = `<div>${cards}${listenButtonHTML(plain.substring(0, 300))}</div>`;
+            speakYojanaReply(plain);
+            return;
+        }
+
+        const raw = data.agent_advice || "";
+        if (!raw) {
+            el.innerHTML = `<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800">No information found. Please try a different query.</div>`;
+            return;
+        }
+
+        // Parse the formatted text from sarkari_yojana_agent into sections
+        // Format: "📌 Name\n\n✅ Eligibility:\n• ...\n\n🎁 Benefits:\n• ...\n\n📝 How to Apply:\n1. ..."
+        // Split multiple schemes by horizontal rule
+        const schemes = raw.split(/─+/).map(s => s.trim()).filter(Boolean);
+
+        const schemeHtml = schemes.map(block => {
+            const lines = block.split("\n").filter(s => s.trim());
+            const titleLine = lines.find(l => l.startsWith("📌") || l.startsWith("पीएम") || l.trim());
+            const title = titleLine ? titleLine.replace(/^📌\s*/, "").trim() : "";
+
+            function extractSection(marker) {
+                const idx = lines.findIndex(l => l.includes(marker));
+                if (idx < 0) return [];
+                const items = [];
+                for (let i = idx + 1; i < lines.length; i++) {
+                    const l = lines[i].trim();
+                    if (!l || (l.startsWith("📌") || l.startsWith("✅") || l.startsWith("🎁") || l.startsWith("📝"))) break;
+                    items.push(l.replace(/^[•\-\d]+[.)]\s*/, "").trim());
+                }
+                return items.filter(Boolean);
+            }
+
+            const eligibility = extractSection("✅");
+            const benefits = extractSection("🎁");
+            const steps = extractSection("📝");
+
+            function ul(items, color) {
+                return items.map(it => `<li class="flex gap-2"><span class="${color}">•</span><span>${escapeHtml(it)}</span></li>`).join("");
+            }
+            function ol(items) {
+                return items.map((it, i) => `<li class="flex gap-2"><span class="font-bold text-green-700 min-w-[1.2em]">${i+1}.</span><span>${escapeHtml(it)}</span></li>`).join("");
+            }
+
+            return `
+                <div class="border border-green-200 rounded-xl overflow-hidden mb-3">
+                    <div class="bg-green-700 text-white px-4 py-2 font-semibold text-sm">📌 ${escapeHtml(title)}</div>
+                    <div class="p-3 space-y-3">
+                        ${eligibility.length ? `
+                        <div>
+                            <p class="text-xs font-bold text-green-800 uppercase tracking-wide mb-1">✅ Eligibility / पात्रता</p>
+                            <ul class="text-sm text-gray-700 space-y-1 leading-relaxed">${ul(eligibility, "text-green-600")}</ul>
+                        </div>` : ""}
+                        ${benefits.length ? `
+                        <div>
+                            <p class="text-xs font-bold text-yellow-700 uppercase tracking-wide mb-1">🎁 Benefits / लाभ</p>
+                            <ul class="text-sm text-gray-700 space-y-1 leading-relaxed">${ul(benefits, "text-yellow-500")}</ul>
+                        </div>` : ""}
+                        ${steps.length ? `
+                        <div>
+                            <p class="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">📝 How to Apply / आवेदन प्रक्रिया</p>
+                            <ol class="text-sm text-gray-700 space-y-1 leading-relaxed list-none">${ol(steps)}</ol>
+                        </div>` : ""}
+                        ${!eligibility.length && !benefits.length && !steps.length ? `<p class="text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(block)}</p>` : ""}
+                    </div>
+                </div>`;
+        }).join("");
+
+        const advice = raw;
+        _resultStore["yojanaResult"] = advice;
+        el.innerHTML = `
+            <div>
+                ${schemeHtml}
+                ${listenButtonHTML(advice.substring(0, 300))}
+            </div>`;
+        speakYojanaReply(advice);
+    }
+
+    async function testYojana(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Get query: prefer scheme dropdown, fall back to custom text input
+        const schemeVal = document.getElementById("yojanaScheme").value.trim();
+        const customEl = document.getElementById("yojanaQuery");
+        const customVal = customEl ? customEl.value.trim() : "";
+        const query = schemeVal || customVal;
+
+        if (!query) {
+            showResult("yojanaResult", t("result.error") + t("yojana.noScheme"), true);
+            return;
+        }
+        const payload = {
+            query,
+            state: document.getElementById("yojanaState").value.trim() || null,
+            language: getApiLang()
+        };
+        const btn = event.currentTarget;
+        disableBtn(btn);
+        try {
+            setLoading("yojanaResult", t("yojana.fetching"));
+            const data = await apiFetch(`${BASE_URL}/api/yojana`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+            renderYojanaCard(data);
+        } catch(e) {
+            showResult("yojanaResult", t("result.error") + e.message, true);
+        } finally {
+            enableBtn(btn);
+        }
+    }
+
+    // ─────────────────────────────────────────
+    // Farm Profile (saved in browser localStorage)
+    // ─────────────────────────────────────────
+    const PROFILE_KEY = "kisanmind_profile_v1";
+
+    function loadProfile() {
+        try {
+            const raw = localStorage.getItem(PROFILE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    }
+
+    function setIfExists(id, value) {
+        const el = document.getElementById(id);
+        if (!el || value == null || value === "") return;
+        // Only fill if user hasn't already typed something
+        if (("value" in el) && !el.value) el.value = value;
+    }
+
+    function applyProfileToInputs(p) {
+        if (!p) return;
+        setIfExists("weatherCity", p.city);
+        setIfExists("regionCity", p.city);
+        setIfExists("mandiState", p.state);
+        setIfExists("yojanaState", p.state);
+        setIfExists("commodity", p.crop);
+        setIfExists("diseaseCrop", p.crop);
+    }
+
+    function openProfile(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const p = loadProfile() || {};
+        const cityEl = document.getElementById("profileCity");
+        const stateEl = document.getElementById("profileState");
+        const cropEl = document.getElementById("profileCrop");
+        if (cityEl) cityEl.value = p.city || "";
+        if (stateEl) stateEl.value = p.state || "";
+        if (cropEl) cropEl.value = p.crop || "";
+        const status = document.getElementById("profileStatus");
+        if (status) status.classList.add("hidden");
+        document.getElementById("profileModal").classList.remove("hidden");
+    }
+
+    function closeProfile() {
+        document.getElementById("profileModal").classList.add("hidden");
+    }
+
+    function saveProfile(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        const profile = {
+            city:  (document.getElementById("profileCity").value  || "").trim(),
+            state: (document.getElementById("profileState").value || "").trim(),
+            crop:  (document.getElementById("profileCrop").value  || "").trim(),
+        };
+        const status = document.getElementById("profileStatus");
+        if (!profile.city && !profile.state && !profile.crop) {
+            if (status) {
+                status.textContent = t("profile.empty");
+                status.className = "text-xs text-red-600";
+                status.classList.remove("hidden");
+            }
+            return;
+        }
+        try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch (e) {}
+        // Force-apply (overwrite) on save so user sees the result immediately
+        if (profile.city)  { const a=document.getElementById("weatherCity"); if(a) a.value=profile.city;
+                             const b=document.getElementById("regionCity");  if(b) b.value=profile.city; }
+        if (profile.state) { const a=document.getElementById("mandiState");  if(a) a.value=profile.state;
+                             const b=document.getElementById("yojanaState"); if(b) b.value=profile.state; }
+        if (profile.crop)  { const a=document.getElementById("commodity");   if(a) a.value=profile.crop;
+                             const b=document.getElementById("diseaseCrop"); if(b) b.value=profile.crop; }
+        if (status) {
+            status.textContent = t("profile.saved");
+            status.className = "text-xs text-green-700";
+            status.classList.remove("hidden");
+        }
+        setTimeout(closeProfile, 900);
+    }
+
+    function clearProfile(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        try { localStorage.removeItem(PROFILE_KEY); } catch (e) {}
+        ["profileCity","profileState","profileCrop"].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = "";
+        });
+        const status = document.getElementById("profileStatus");
+        if (status) {
+            status.textContent = t("profile.cleared");
+            status.className = "text-xs text-gray-500";
+            status.classList.remove("hidden");
+        }
+    }
+
+    // Apply translations on initial load (default language is Hindi)
+    document.addEventListener("DOMContentLoaded", () => {
+        const sel = document.getElementById("langToggle");
+        if (sel) sel.value = voiceLang;
+        applyI18n();
+        // Auto-fill all inputs from the saved farm profile (if any)
+        applyProfileToInputs(loadProfile());
+    });
+</script>
+
+</body>
+</html>
